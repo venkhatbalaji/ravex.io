@@ -1,8 +1,11 @@
 import type { Metadata, Viewport } from "next";
+import { getSiteUrl } from "@/lib/site-url";
 import "./globals.css";
 
+const siteUrl = getSiteUrl();
+
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://ravex.io"),
+  metadataBase: new URL(siteUrl),
   title: { default: "Ravex — Build what moves business forward", template: "%s · Ravex" },
   description: "Ravex creates secure fintech platforms, practical AI solutions and people-first HR technology for ambitious companies.",
   keywords: ["fintech development", "AI solutions", "HR technology", "digital transformation", "software company"],
