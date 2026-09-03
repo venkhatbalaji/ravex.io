@@ -15,9 +15,17 @@ export default function Home() {
   const jsonLd = { "@context": "https://schema.org", "@type": "Organization", name: "Ravex", url: "https://ravex.io", email: "hello@ravex.io", description: "Fintech, AI and HR technology solutions." };
   return <main><RevealController/><Script id="organization-schema" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}/><Nav/>
     <section className="hero">
-      <div className="hero-orbit orbit-one"/><div className="hero-orbit orbit-two"/>
+      <div className="hero-glow"/>
+      <div className="hero-system" aria-hidden="true">
+        <div className="system-ring ring-outer"><i/><i/><i/></div>
+        <div className="system-ring ring-inner"><i/><i/></div>
+        <div className="system-core"><span>R</span><small>RAVEX / CORE</small></div>
+        <div className="system-node node-fintech"><b>01</b><span>FINTECH</span></div>
+        <div className="system-node node-ai"><b>02</b><span>INTELLIGENCE</span></div>
+        <div className="system-node node-people"><b>03</b><span>PEOPLE</span></div>
+      </div>
       <div className="eyebrow hero-eyebrow"><span/>Technology with purpose</div>
-      <h1>Ideas engineered<br/>for <em>impact.</em></h1>
+      <h1><span>Ideas engineered</span><br/><span>for <em>impact.</em></span></h1>
       <p className="hero-copy">We build fintech, AI and people solutions that turn ambitious thinking into meaningful progress.</p>
       <a href="#services" className="text-link">Explore our expertise <Icon name="arrow" size={19}/></a>
       <div className="scroll-cue"><span>Scroll to discover</span><i/></div>
