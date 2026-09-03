@@ -1,0 +1,7 @@
+import type { Metadata } from "next";
+import { Footer } from "@/components/footer";
+import { Nav } from "@/components/nav";
+
+export const metadata: Metadata = { title: "Privacy", description: "How Ravex handles your information.", robots: { index: true, follow: true } };
+export default function PrivacyPage() { return <main className="inner-page legal"><Nav/><article><div className="eyebrow light"><span/>Legal</div><h1>Privacy policy.</h1><p className="updated">Last updated: September 3, 2026</p><h2>Information we collect</h2><p>When you contact Ravex, we collect the details you provide, such as your name, work email, service interest and message. We also receive basic technical information needed to operate and secure this website.</p><h2>How we use it</h2><p>We use your information to respond to your inquiry, understand your needs, improve our services and protect our website. We do not sell personal information.</p><h2>Storage and retention</h2><p>Inquiry details are stored securely and kept only as long as reasonably necessary for the purpose for which they were collected, or to meet legal obligations.</p><h2>Your choices</h2><p>You may ask to access, correct or delete your personal information by emailing <a href="mailto:hello@ravex.io">hello@ravex.io</a>.</p><h2>Updates</h2><p>We may update this policy as our services evolve. The date above shows when it was last revised.</p></article><Footer/></main> }
+
