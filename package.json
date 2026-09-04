@@ -7,7 +7,9 @@
     "dev": "npm run dev --workspace=@ravex/web",
     "build": "npm run build --workspace=@ravex/web",
     "lint": "npm run lint --workspace=@ravex/web",
-    "typecheck": "npm run typecheck --workspace=@ravex/web"
+    "typecheck": "npm run typecheck --workspace=@ravex/web",
+    "db:generate": "npm run db:generate --workspace=@ravex/web",
+    "db:migrate": "npm run db:migrate --workspace=@ravex/web"
   },
   "engines": { "node": ">=20" }
 }
