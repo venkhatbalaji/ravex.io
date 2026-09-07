@@ -5,6 +5,7 @@ import { HeroGlow } from "@/components/hero-glow";
 import { Icon } from "@/components/icons";
 import { Nav } from "@/components/nav";
 import { RevealController } from "@/components/reveal";
+import { ServicesTree } from "@/components/services-tree";
 
 const services = [
   { number: "01", icon: "fintech" as const, name: "Fintech", title: "Finance, engineered for trust.", copy: "Secure digital banking, payments and financial platforms that simplify complexity and scale with confidence.", tags: ["Digital banking", "Payments", "Risk & compliance"] },
@@ -54,26 +55,7 @@ export default function Home() {
       </section>
     </div>
 
-    <div className="pin-host">
-      <section className="services stack-panel" id="services">
-        <div className="services-intro" data-reveal>
-          <div className="eyebrow"><span/>Our expertise</div>
-          <h2>Three disciplines.<br/>One standard.</h2>
-          <p>Deep domain thinking meets precise engineering. We partner from first idea to lasting impact.</p>
-          <div className="scroll-hint"><i/>Scroll to explore</div>
-        </div>
-        <div className="service-scroll">{services.map((service) => <article className="service-card" key={service.name}>
-          <div className="service-card-top">
-            <div className="service-meta"><span>{service.number}</span><div className="service-icon"><Icon name={service.icon} size={24}/></div></div>
-            <a href="#contact" aria-label={`Discuss ${service.name}`}><Icon name="arrow"/></a>
-          </div>
-          <h3>{service.name}</h3>
-          <h4>{service.title}</h4>
-          <p>{service.copy}</p>
-          <div className="tags">{service.tags.map(tag => <span key={tag}>{tag}</span>)}</div>
-        </article>)}</div>
-      </section>
-    </div>
+    <ServicesTree services={services}/>
 
     <div className="pin-host">
       <section className="approach stack-panel" id="approach"><div className="approach-visual"><div className="rings"><span/><span/><span/><div>R</div></div><p>Clarity at the centre.<br/>Progress in every direction.</p></div><div className="approach-copy"><div className="eyebrow light"><span/>How we work</div><h2>Built around<br/>your <em>reality.</em></h2><p>We don’t arrive with a fixed answer. We listen, challenge and shape the right solution around your business—not the other way around.</p><ol><li><b>01</b><span><strong>Understand deeply</strong>We get close to the problem, the people and the context.</span></li><li><b>02</b><span><strong>Think precisely</strong>We turn complexity into a clear, focused direction.</span></li><li><b>03</b><span><strong>Build responsibly</strong>We create secure, scalable systems made to last.</span></li></ol></div></section>
