@@ -9,12 +9,92 @@ services:
       - "5432:5432"
     volumes:
       - ravex_postgres:/var/lib/postgresql/data
-      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./infra/postgres/init-platform.sql:/docker-entrypoint-initdb.d/02-init-platform.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ravex"]
       interval: 5s
       timeout: 3s
       retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  nats:
+    image: nats:2-alpine
+    command: ["-js"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+
+  identity:
+    build:
+      context: .
+      dockerfile: services/identity/Dockerfile
+    ports:
+      - "5101:8080"
+    environment:
+      IDENTITY_DB_CONNECTION: "Host=postgres;Port=5432;Database=ravex;Username=ravex;Password=ravex_dev;Search Path=identity"
+      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:-dev-only-signing-key-change-me-please-32bytes!}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  wallet-ledger:
+    build:
+      context: .
+      dockerfile: services/wallet-ledger/Dockerfile
+    ports:
+      - "5102:8080"
+    environment:
+      WALLET_DB_CONNECTION: "Host=postgres;Port=5432;Database=ravex;Username=ravex;Password=ravex_dev;Search Path=wallet"
+      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:-dev-only-signing-key-change-me-please-32bytes!}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  market-catalog:
+    build:
+      context: .
+      dockerfile: services/market-catalog/Dockerfile
+    ports:
+      - "5103:8080"
+    environment:
+      MARKET_CATALOG_DB_CONNECTION: "Host=postgres;Port=5432;Database=ravex;Username=ravex;Password=ravex_dev;Search Path=market_catalog"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  settlement-engine:
+    build: ./services/settlement-engine
+    ports:
+      - "5201:8080"
+    environment:
+      WALLET_SERVICE_URL: "http://wallet-ledger:8080"
+    depends_on:
+      - wallet-ledger
+
+  gateway:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    ports:
+      - "5100:8080"
+    environment:
+      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:-dev-only-signing-key-change-me-please-32bytes!}
+    depends_on:
+      - identity
+      - wallet-ledger
+      - market-catalog
+      - settlement-engine
+
 volumes:
   ravex_postgres:
 

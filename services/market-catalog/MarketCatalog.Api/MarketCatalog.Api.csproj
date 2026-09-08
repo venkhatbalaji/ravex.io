@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MarketCatalog.Application\MarketCatalog.Application.csproj" />
+    <ProjectReference Include="..\MarketCatalog.Infrastructure\MarketCatalog.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -19,8 +19,19 @@ To sign up and use the chat agent locally, also set `GEMINI_API_KEY` and `BETTER
 ## Workspace layout
 
 - `apps/web` — Next.js marketing site, inquiry API, and the authenticated chat agent
-- `infra/postgres` — local database bootstrap (the `inquiries` table only — everything else is migrated via drizzle-kit)
+- `apps/platform` — the prediction-market product itself: Next.js + Tailwind, talks only to the gateway at `:5100` — see below
+- `services` — prediction-market backend: `gateway` (YARP), `identity`, `wallet-ledger`, `market-catalog` (.NET 8, Clean Architecture) and `settlement-engine` (Go) — see `services/README.md`
+- `infra/postgres` — local database bootstrap (the `inquiries` table for `apps/web`, plus per-service schemas for `services/*`)
 - `packages` — reserved for shared contracts, UI and configuration as services are added
+
+Run the backend services with `docker compose up -d --build` (see `services/README.md` for the golden-path walkthrough and ports), then run the product frontend natively — same pattern as `apps/web`, for proper hot-reload:
+
+```bash
+cp apps/platform/.env.example apps/platform/.env.local
+npm run dev:platform
+```
+
+Open http://localhost:3001 (`apps/web` already owns :3000, so `platform` runs alongside it on :3001 rather than colliding). Register an account, then visit `/wallet` to earn free coins and `/` to create a market and place a stake — every action there is real: it debits your actual wallet balance through the gateway, not a mock.
 
 ## Database migrations
 

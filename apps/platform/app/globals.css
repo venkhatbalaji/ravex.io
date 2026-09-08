@@ -1,0 +1,169 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-text: var(--accent-text);
+  --color-accent-2: var(--accent-2);
+  --color-accent-2-fg: var(--accent-2-fg);
+  --color-accent-2-text: var(--accent-2-text);
+  --color-warning-text: var(--warning-text);
+  --color-danger: var(--danger);
+  --font-display: var(--font-fredoka), "Segoe UI", sans-serif;
+  --font-body: var(--font-fredoka), "Segoe UI", sans-serif;
+  --font-mono: var(--font-mono-loaded), ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+/* Palette lifted straight from the Predict Play mark: navy, mascot gold,
+   lightning-bolt blue. Dark is the true default — no data-theme attribute
+   at all, not just the first branch of a media query. */
+:root {
+  --bg: #101a30;
+  --surface: #182545;
+  --surface-2: #1f2e52;
+  --border: #283962;
+  --border-strong: #34477a;
+  --fg: #f5efdd;
+  --muted: #93a0c4;
+  --accent: #ffc53d;
+  --accent-fg: #101a30;
+  --accent-text: #ffc53d;
+  --accent-2: #38bdf8;
+  --accent-2-fg: #101a30;
+  --accent-2-text: #38bdf8;
+  --warning-text: #fbbf24;
+  --danger: #ff6b6b;
+}
+
+:root[data-theme="light"] {
+  --bg: #fbf7ec;
+  --surface: #f1ebd9;
+  --surface-2: #e7dfc7;
+  --border: #dad1b4;
+  --border-strong: #c7bc98;
+  --fg: #101a30;
+  --muted: #5b6478;
+  --accent: #ffc53d;
+  --accent-fg: #101a30;
+  --accent-text: #8a5a00;
+  --accent-2: #38bdf8;
+  --accent-2-fg: #101a30;
+  --accent-2-text: #12699c;
+  --warning-text: #92400e;
+  --danger: #c23b3b;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  position: relative;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body), sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* A near-invisible scanline texture — the one deliberately "gamer HUD" cue
+   that costs nothing (pure CSS, no asset) and stays subtle in both themes. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.4;
+  background-image: repeating-linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--accent) 6%, transparent) 0px,
+    color-mix(in srgb, var(--accent) 6%, transparent) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+/* Same reveal-on-scroll contract as apps/web: opacity/transform only,
+   flipped by RevealController's IntersectionObserver. */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity 0.7s ease,
+    transform 0.7s ease;
+}
+[data-reveal].revealed {
+  opacity: 1;
+  transform: none;
+}
+
+@keyframes live-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+}
+.live-dot {
+  animation: live-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+.animate-float {
+  animation: float 4.5s ease-in-out infinite;
+}
+
+/* Neon-glow on hover — spent on a handful of primary actions and cards,
+   not everywhere, so it still reads as an accent rather than noise. */
+.glow-accent {
+  transition:
+    box-shadow 0.3s ease,
+    transform 0.3s ease;
+}
+.glow-accent:hover {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent),
+    0 0 24px -4px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  [data-reveal] {
+    opacity: 1;
+    transform: none;
+  }
+  .live-dot,
+  .animate-float {
+    animation: none;
+  }
+}
