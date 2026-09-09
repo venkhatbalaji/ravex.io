@@ -6,58 +6,55 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
-
 	"ravex/settlement-engine/internal/domain"
+	"strings"
+	"time"
 )
 
-// HTTPClient is the adapter for domain.WalletClient — a direct synchronous
-// call to Wallet & Ledger's POST /wallet/me/stake, using the caller's own
-// bearer token so Wallet's existing JWT auth decides whose balance moves.
 type HTTPClient struct {
-	baseURL string
-	client  *http.Client
+	baseURL, serviceKey string
+	client              *http.Client
 }
 
-func NewHTTPClient(baseURL string) *HTTPClient {
-	return &HTTPClient{baseURL: baseURL, client: &http.Client{Timeout: 5 * time.Second}}
+func NewHTTPClient(baseURL, serviceKey string) *HTTPClient {
+	return &HTTPClient{baseURL: strings.TrimRight(baseURL, "/"), serviceKey: serviceKey, client: &http.Client{Timeout: 5 * time.Second}}
 }
 
-type stakeRequest struct {
-	MarketID  string `json:"marketId"`
-	OutcomeID string `json:"outcomeId"`
-	Amount    int64  `json:"amount"`
-}
-
-func (c *HTTPClient) DebitStake(ctx context.Context, bearerToken, marketID, outcomeID string, amount int64) error {
-	body, err := json.Marshal(stakeRequest{MarketID: marketID, OutcomeID: outcomeID, Amount: amount})
+func (c *HTTPClient) DebitStake(ctx context.Context, stake domain.Stake) error {
+	body, err := json.Marshal(map[string]any{"userId": stake.UserID, "marketId": stake.MarketID, "outcomeId": stake.OutcomeID, "amount": stake.Amount})
 	if err != nil {
-		return fmt.Errorf("encoding stake request: %w", err)
+		return err
 	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/wallet/me/stake", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/internal/stakes/"+stake.ID, bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("building wallet request: %w", err)
+		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if bearerToken != "" {
-		req.Header.Set("Authorization", bearerToken)
-	}
-
+	req.Header.Set("X-Service-Key", c.serviceKey)
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("calling wallet service: %w", err)
+		return fmt.Errorf("wallet debit: %w", err)
 	}
 	defer resp.Body.Close()
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-		return nil
-	case http.StatusUnauthorized:
-		return domain.ErrUnauthorized
-	case http.StatusPaymentRequired:
-		return domain.ErrInsufficientBalance
-	default:
-		return fmt.Errorf("wallet service returned status %d", resp.StatusCode)
+	if resp.StatusCode != 200 && resp.StatusCode != 402 {
+		return fmt.Errorf("wallet returned status %d", resp.StatusCode)
 	}
+	var result struct {
+		StakeID  string `json:"stakeId"`
+		Accepted bool   `json:"accepted"`
+		Debited  int64  `json:"debited"`
+	}
+	if err = json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return fmt.Errorf("wallet response: %w", err)
+	}
+	if result.StakeID != stake.ID {
+		return fmt.Errorf("wallet returned a mismatched stake")
+	}
+	if resp.StatusCode == 200 && result.Accepted && result.Debited == stake.Amount {
+		return nil
+	}
+	if resp.StatusCode == 402 && !result.Accepted && result.Debited == 0 {
+		return domain.ErrInsufficientBalance
+	}
+	return fmt.Errorf("wallet returned an inconsistent decision")
 }

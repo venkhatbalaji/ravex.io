@@ -1,0 +1,71 @@
+# Isolated integration environment. No existing dev ports or volumes are used.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ravex
+      POSTGRES_PASSWORD: ravex_test
+      POSTGRES_DB: ravex
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ravex"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    tmpfs: /var/lib/postgresql/data
+  identity:
+    build:
+      context: ../..
+      dockerfile: services/identity/Dockerfile
+    environment:
+      IDENTITY_DB_CONNECTION: "Host=postgres;Database=ravex;Username=ravex;Password=ravex_test;Search Path=identity"
+    depends_on:
+      postgres:
+        condition: service_healthy
+  wallet-ledger:
+    build:
+      context: ../..
+      dockerfile: services/wallet-ledger/Dockerfile
+    environment:
+      WALLET_DB_CONNECTION: "Host=postgres;Database=ravex;Username=ravex;Password=ravex_test;Search Path=wallet"
+      INTERNAL_SERVICE_KEY: integration-only-service-key-32-characters
+    ports: ["127.0.0.1::8080"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+  market-catalog:
+    build:
+      context: ../..
+      dockerfile: services/market-catalog/Dockerfile
+    environment:
+      MARKET_CATALOG_DB_CONNECTION: "Host=postgres;Database=ravex;Username=ravex;Password=ravex_test;Search Path=market_catalog"
+      INTERNAL_SERVICE_KEY: integration-only-service-key-32-characters
+      SETTLEMENT_SERVICE_URL: "http://settlement-engine:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+  settlement-engine:
+    build: ../settlement-engine
+    environment:
+      SETTLEMENT_DB_CONNECTION: "postgres://ravex:ravex_test@postgres/ravex?sslmode=disable"
+      IDENTITY_SERVICE_URL: "http://identity:8080"
+      WALLET_SERVICE_URL: "http://wallet-ledger:8080"
+      MARKET_CATALOG_SERVICE_URL: "http://market-catalog:8080"
+      INTERNAL_SERVICE_KEY: integration-only-service-key-32-characters
+    ports: ["127.0.0.1::8080"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+  gateway:
+    build:
+      context: ../..
+      dockerfile: services/gateway/Dockerfile
+    ports: ["127.0.0.1::8080"]
+    depends_on: [identity, wallet-ledger, market-catalog, settlement-engine]
+  go-tests:
+    image: golang:1.22-alpine
+    profiles: [test]
+    working_dir: /src
+    volumes: ["../settlement-engine:/src:ro"]
+    environment:
+      TEST_DATABASE_URL: "postgres://ravex:ravex_test@postgres/settlement_tests?sslmode=disable"
+    command: ["sh", "-c", "go test ./... && go vet ./..."]

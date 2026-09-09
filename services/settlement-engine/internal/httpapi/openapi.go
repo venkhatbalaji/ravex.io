@@ -2,29 +2,55 @@ package httpapi
 
 import "net/http"
 
-// No swaggo/codegen dependency for four endpoints — the spec is hand-written
+// The public API spec is hand-written
 // and served as-is; swagger-ui itself loads from a CDN in the browser.
 const openAPISpec = `{
   "openapi": "3.0.3",
   "info": {
     "title": "Ravex Settlement Engine API",
     "version": "v1",
-    "description": "Pari-mutuel pool aggregation and payout computation. In-memory only in local dev — pools reset on restart."
+    "description": "Durable per-player stake admission, pool aggregation, and payout-ratio computation. Wallet payouts are not implemented."
   },
   "paths": {
     "/health": {
       "get": {
         "summary": "Health check",
-        "responses": { "200": { "description": "OK" } }
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
       }
     },
     "/pools/{marketId}/stakes": {
       "post": {
-        "summary": "Debit the caller's wallet and add a stake to a market's pool",
-        "description": "Calls Wallet & Ledger's POST /wallet/me/stake synchronously before adding to the pool, using the caller's own Authorization header — a stake that isn't backed by a real debit is rejected, not recorded.",
-        "security": [{ "Bearer": [] }],
+        "summary": "Admit or retry a coin stake",
+        "description": "Validates the player through Identity and saves a stake intent in PostgreSQL before requesting a service-authorized, idempotent Wallet debit. Reuse the same Idempotency-Key and payload after a timeout, 202, or 5xx. An admitted stake can complete after cutoff or market closure. A background worker recovers pending stakes; never create a new key to retry an uncertain request.",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
         "parameters": [
-          { "name": "marketId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+          {
+            "name": "marketId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Client-generated non-empty UUID, scoped to the authenticated player. Reuse for the same attempt."
+          }
         ],
         "requestBody": {
           "required": true,
@@ -32,21 +58,64 @@ const openAPISpec = `{
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["outcomeId", "amount"],
+                "required": [
+                  "outcomeId",
+                  "amount"
+                ],
                 "properties": {
-                  "outcomeId": { "type": "string", "format": "uuid" },
-                  "amount": { "type": "integer", "format": "int64", "minimum": 1 }
+                  "outcomeId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "amount": {
+                    "type": "integer",
+                    "format": "int64",
+                    "minimum": 1
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Debited and updated pool snapshot", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PoolSnapshot" } } } },
-          "400": { "description": "outcomeId missing or amount not positive" },
-          "401": { "description": "Missing or invalid bearer token" },
-          "402": { "description": "Insufficient wallet balance" },
-          "502": { "description": "Wallet service unreachable" }
+          "200": {
+            "description": "Accepted stake and current pool snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StakeSubmission"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID, missing key, unknown outcome, or invalid positive integer amount"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "402": {
+            "description": "Insufficient wallet balance"
+          },
+          "404": {
+            "description": "Market not found"
+          },
+          "409": {
+            "description": "Market closed or key reused with a different payload"
+          },
+          "502": {
+            "description": "Dependency or storage failure; retry the same key because a stake may already be admitted"
+          },
+          "202": {
+            "description": "Durably admitted, debit decision still pending. Retry the same key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StakeSubmission"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -54,10 +123,27 @@ const openAPISpec = `{
       "get": {
         "summary": "Get a market's current pool snapshot and implied odds",
         "parameters": [
-          { "name": "marketId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+          {
+            "name": "marketId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Pool snapshot", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PoolSnapshot" } } } }
+          "200": {
+            "description": "Pool snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoolSnapshot"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -65,7 +151,15 @@ const openAPISpec = `{
       "post": {
         "summary": "Compute the payout ratio for a winning outcome",
         "parameters": [
-          { "name": "marketId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+          {
+            "name": "marketId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
         ],
         "requestBody": {
           "required": true,
@@ -73,42 +167,150 @@ const openAPISpec = `{
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["winningOutcomeId"],
-                "properties": { "winningOutcomeId": { "type": "string", "format": "uuid" } }
+                "required": [
+                  "winningOutcomeId"
+                ],
+                "properties": {
+                  "winningOutcomeId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Settlement result", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SettlementResult" } } } },
-          "409": { "description": "No stakes were placed on the winning outcome" }
-        }
+          "200": {
+            "description": "Settlement result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettlementResult"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Admission still open, pending stakes, or no stakes on the winning outcome"
+          },
+          "401": {
+            "description": "Missing or invalid player token"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "description": "Calculation only; does not credit wallets or persist a result. Admission must already be closed and all admitted stakes must be terminal."
       }
     }
   },
   "components": {
     "securitySchemes": {
-      "Bearer": { "type": "apiKey", "name": "Authorization", "in": "header", "description": "A JWT from POST /auth/login, e.g. \"Bearer {token}\"" }
+      "Bearer": {
+        "type": "apiKey",
+        "name": "Authorization",
+        "in": "header",
+        "description": "A JWT from POST /auth/login, e.g. \"Bearer {token}\""
+      }
     },
     "schemas": {
       "PoolSnapshot": {
         "type": "object",
         "properties": {
-          "marketId": { "type": "string" },
-          "totals": { "type": "object", "additionalProperties": { "type": "integer" } },
-          "impliedOdds": { "type": "object", "additionalProperties": { "type": "number" } },
-          "totalPool": { "type": "integer" }
+          "marketId": {
+            "type": "string"
+          },
+          "totals": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "impliedOdds": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "totalPool": {
+            "type": "integer"
+          }
         }
       },
       "SettlementResult": {
         "type": "object",
         "properties": {
-          "marketId": { "type": "string" },
-          "winningOutcomeId": { "type": "string" },
-          "totalPool": { "type": "integer" },
-          "winningPool": { "type": "integer" },
-          "payoutRatio": { "type": "number" }
+          "marketId": {
+            "type": "string"
+          },
+          "winningOutcomeId": {
+            "type": "string"
+          },
+          "totalPool": {
+            "type": "integer"
+          },
+          "winningPool": {
+            "type": "integer"
+          },
+          "payoutRatio": {
+            "type": "number"
+          }
         }
+      },
+      "StakeSubmission": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PoolSnapshot"
+          },
+          {
+            "type": "object",
+            "required": [
+              "stake"
+            ],
+            "properties": {
+              "stake": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "marketId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "outcomeId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "amount": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "accepted",
+                      "rejected"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "updatedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          }
+        ]
       }
     }
   }

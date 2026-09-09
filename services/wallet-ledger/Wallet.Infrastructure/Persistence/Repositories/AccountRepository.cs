@@ -16,9 +16,13 @@ public sealed class AccountRepository : IAccountRepository
         if (account is not null) return account;
 
         account = Account.ForUser(userId);
-        _db.Accounts.Add(account);
-        await _db.SaveChangesAsync(ct);
-        return account;
+        // Reads may lazily create the same account concurrently with a mutation.
+        await _db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO wallet.accounts ("Id", "OwnerType", "OwnerUserId", "CreatedAt")
+            VALUES ({account.Id}, {"User"}, {userId}, {account.CreatedAt})
+            ON CONFLICT ("OwnerUserId") DO NOTHING
+            """, ct);
+        return await _db.Accounts.SingleAsync(a => a.OwnerUserId == userId, ct);
     }
 
     public Task<Account> GetHouseAccountAsync(CancellationToken ct = default) =>

@@ -1,146 +1,167 @@
 # Backend services
 
-Local-dev backend for the prediction-market product: coin-staked, pari-mutuel
-markets settled off a match feed. Free-to-play for now — real-money coin
-purchase is built into the Wallet service but sits behind a flag that's off
-by default (see `Wallet.Infrastructure/Configuration/StaticEarnRateCatalog.cs`).
+Free-to-play, coin-staked prediction markets with manually entered results.
+Wallet issues earned virtual coins; purchases, payouts, and a match feed are
+not implemented. See the [product roadmap](../docs/prediction-roadmap.md).
 
-Each .NET service follows the same Clean Architecture layering:
+## Architecture
 
+Each .NET service uses Clean Architecture:
+
+```text
+Domain          entities, invariants, repository interfaces
+Application     use cases, contracts, transaction and service ports
+Infrastructure  EF Core, PostgreSQL transactions, HTTP adapters, DI
+Api             endpoints, authentication, HTTP error mapping
 ```
-{Service}.Domain          entities, invariants, repository interfaces — no framework deps
-{Service}.Application     use cases (one class per operation), DTOs, app-level exceptions
-{Service}.Infrastructure  EF Core, repositories, external concerns, DI composition
-{Service}.Api             thin Program.cs, endpoint groups, HTTP <-> exception mapping
-```
 
-Dependencies only point inward (`Api` -> `Application`/`Infrastructure` -> `Domain`).
-`Domain` never references EF Core, ASP.NET, or any other service.
+Dependencies point inward. The Go Settlement service follows the same
+boundaries: `internal/domain`, `internal/service`, `internal/store`, and HTTP
+adapters for Catalog, Identity, and Wallet. Each service owns its persistence;
+services never query another service's tables.
 
-The Go `settlement-engine` mirrors this with packages instead of projects:
-`internal/domain` (the `Pool` aggregate and the `PoolRepository`/`WalletClient`
-ports), `internal/service` (use-case orchestration behind those ports),
-`internal/store` (the in-memory pool adapter) and `internal/walletclient`
-(the HTTP adapter to Wallet) — each swappable later without touching the
-other layers — and `internal/httpapi` (transport).
+| Service | Local port | Owns |
+| --- | --- | --- |
+| gateway (.NET/YARP) | 5100 | Public entry point and route authentication |
+| identity (.NET) | 5101 | Registration, login, JWTs |
+| wallet-ledger (.NET) | 5102 | Coin balances, ledger, durable debit decisions |
+| market-catalog (.NET) | 5103 | Market definitions, lock/result lifecycle |
+| settlement-engine (Go) | 5201 | Durable player stakes, admission gates, recovery, pool totals |
 
-### How a stake actually moves money
+Clients call gateway `:5100`. Other ports are exposed for local debugging.
+Gateway routes `/auth/*` and `/me` to Identity, `/wallet/*` to Wallet,
+`/markets/*` to Catalog, and `/pools/*` to Settlement. `/internal/*` endpoints
+are not routed by Gateway and require `X-Service-Key` at the owning service.
 
-`POST /pools/{marketId}/stakes` on Settlement Engine does **not** just add to
-an in-memory total. It forwards the caller's own `Authorization` bearer token
-to Wallet & Ledger's `POST /wallet/me/stake` *synchronously, before* touching
-the pool — insufficient balance (402) or a missing/invalid token (401) rejects
-the stake outright, so a pool can never hold a stake nobody actually paid for.
-This is a direct HTTP call, not an event over NATS: a debit that must succeed
-before a stake counts needs strong, immediate consistency, not eventual
-consistency. Wallet records the debit as a normal double-entry ledger
-transaction, moving coins from the player's account into a dedicated `Pool`
-escrow account (`Account.PoolAccountId`) — separate from the `House` account
-so "coins currently staked" and "coins issued as rewards" never get conflated
-in the books. NATS stays unwired for now — publishing an audit event nobody
-consumes yet would just be dead code; it's the right tool for the *next*
-thing that needs fan-out (notifications, fraud signals), not for this.
+The .NET services expose `/swagger`; Settlement exposes `/swagger` and
+`/openapi.json`. Each service has `/health`. PostgreSQL schemas are `identity`,
+`wallet`, `market_catalog`, and `settlement` in the local `ravex` database.
+Redis and NATS are available in Compose but currently unused.
 
-## Services
+## Stake admission and recovery
 
-| Service | Port | Stack | Owns | Swagger |
-|---|---|---|---|---|
-| **gateway** | **5100** | .NET 8 (YARP) | **single entry point — route here, not the ports below** | — |
-| identity | 5101 | .NET 8 | register/login, issues JWTs | [/swagger](http://localhost:5101/swagger) |
-| wallet-ledger | 5102 | .NET 8 | earned-coin double-entry ledger, validates JWTs | [/swagger](http://localhost:5102/swagger) |
-| market-catalog | 5103 | .NET 8 | market/outcome lifecycle (open → locked → settled) | [/swagger](http://localhost:5103/swagger) |
-| settlement-engine | 5201 | Go | pari-mutuel pool aggregation + payout computation | [/swagger](http://localhost:5201/swagger) |
+1. The client sends `POST /pools/{marketId}/stakes` with its bearer token,
+   a UUID `Idempotency-Key` header, and `{ "outcomeId": "...", "amount": 10 }`.
+   The platform saves this attempt in session storage before sending it.
+2. Settlement authenticates the player through Identity `/me`; the request
+   cannot choose a user ID. Catalog supplies the market and valid outcomes.
+3. A Settlement database transaction serializes the player's idempotency key
+   and market admission gate. An existing matching intent is returned even
+   after cutoff; different payloads conflict. New intents require an open
+   market, valid outcome, open gate, and a future cutoff.
+4. Settlement commits the intent before calling Wallet
+   `POST /internal/stakes/{stakeId}` using `X-Service-Key`. The body contains
+   the verified player ID, market, outcome, and coin amount. The former public
+   `POST /wallet/me/stake` endpoint has been removed.
+5. Wallet serializes the operation and player, checks funds, and commits the
+   decision with both ledger entries in one transaction. Funds move from the
+   player to Pool escrow. Both acceptance and insufficient-funds rejection
+   are durable. Replaying the ID returns the original decision; conflicting
+   payloads return 409. Daily reward claims use the same player lock.
+6. Settlement marks the intent accepted or rejected. Only accepted records
+   contribute to pool totals. A lost response leaves the intent pending.
+   A worker retries pending intents every five seconds with the same stake
+   ID, including after restart, without storing player bearer tokens.
 
-**Everything client-facing should call the gateway (`:5100`), not the individual
-service ports** — those stay open on the host for local debugging and
-Swagger, but a frontend or a future mobile app only ever needs one base URL.
-The gateway routes `/auth/*` and `/me` → identity, `/wallet/*` → wallet,
-`/markets/*` → market-catalog, `/pools/*` → settlement-engine, and
-JWT-authenticates a request at the edge whenever the matched route's
-`appsettings.json` entry sets `"AuthorizationPolicy": "authenticated"` — an
-unauthenticated call to a protected route gets rejected by the gateway and
-never reaches the backend at all. Routes without that policy (`/auth/*`,
-`/markets/*`, `GET /pools/*`) stay exactly as open as the service behind
-them — the gateway never enforces auth a backend doesn't already enforce
-itself, which would just be confusing. See
-`services/gateway/Gateway.Api/appsettings.json` for the full route table.
+HTTP 200 means accepted; 202 means admitted and still processing; 402 means
+rejected for insufficient funds. **Retry the same key after a timeout, 202,
+or 5xx.** A fresh key expresses a new prediction. Keys are scoped per player;
+retries return the same stake, alongside the current pool snapshot.
 
-Identity and Wallet's Swagger UI have an **Authorize** button — paste a token from
-`POST /auth/login` in as `Bearer <token>` to call protected endpoints straight
-from the browser. Market Catalog has no auth yet, so nothing to authorize there.
-The Go service's UI is a hand-written `openapi.json` (see
-`internal/httpapi/openapi.go`) rendered by swagger-ui loaded from a CDN — there
-was no reason to pull in a codegen toolchain for four endpoints.
-
-Postgres, Redis and NATS are shared local infra (see root `docker-compose.yml`).
-Each .NET service owns its own Postgres **schema** (`identity`, `wallet`,
-`market_catalog`) inside the same local `ravex` database used by `apps/web` —
-that's a local-dev convenience, not a design decision to carry into staging/prod.
+Market locking first closes Settlement's durable gate. Requests admitted
+before closure are allowed to complete. While any are pending, Catalog's
+lock endpoint returns 409 and its status remains unchanged, but new stakes
+are blocked by the gate. Retry locking after recovery finishes. Catalog only
+persists `locked` after the gate has drained. Settlement ratio computation
+also requires a closed gate and no pending stakes.
 
 ## Run locally
 
 ```bash
 docker compose up -d --build
+npm run dev:platform
 ```
 
-Health checks: `curl localhost:5101/health` (swap the port for 5102/5103/5201).
+Compose provides local-only credentials. Set `INTERNAL_SERVICE_KEY` to a
+shared secret of at least 32 characters for Wallet, Catalog, and Settlement
+outside the local defaults. Settlement also accepts `SETTLEMENT_DB_CONNECTION`,
+`WALLET_SERVICE_URL`, `MARKET_CATALOG_SERVICE_URL`, and `IDENTITY_SERVICE_URL`.
+Catalog uses `SETTLEMENT_SERVICE_URL` to close admission. Configuration is in
+root `docker-compose.yml`. Gateway permits browser requests from
+`http://localhost:3001`, including the idempotency header. Configure
+`Cors:AllowedOrigins` (for example `Cors__AllowedOrigins__0`) for another
+platform origin.
 
-### Try the golden path
+### Upgrading from the in-memory Settlement version
+
+New stakes and decisions survive restarts. Existing in-memory pools from the
+old version are **not imported**: they lack player IDs and stable stake IDs.
+Their historical Wallet debits remain in the ledger. Capture and reconcile
+those old pools before replacing an environment containing stakes you need
+to retain; do not assume rebuilding reconstructs them. The migrations only
+add tables and do not delete historical ledger entries.
+
+### Gateway walkthrough
 
 ```bash
-# register + log in
-curl -s -X POST localhost:5101/auth/register -H 'Content-Type: application/json' \
+curl -s -X POST localhost:5100/auth/register -H 'Content-Type: application/json' \
   -d '{"email":"fan@ravex.io","password":"password123","displayName":"IPL Fan"}'
-TOKEN=$(curl -s -X POST localhost:5101/auth/login -H 'Content-Type: application/json' \
+TOKEN=$(curl -s -X POST localhost:5100/auth/login -H 'Content-Type: application/json' \
   -d '{"email":"fan@ravex.io","password":"password123"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["accessToken"])')
-
-# earn coins (daily_login | rewarded_ad | referral — each once per day)
-curl -s -X POST localhost:5102/wallet/me/earn -H "Authorization: Bearer $TOKEN" \
+curl -s -X POST localhost:5100/wallet/me/earn -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' -d '{"reason":"daily_login"}'
-curl -s localhost:5102/wallet/me/balance -H "Authorization: Bearer $TOKEN"
-
-# create a market, stake (debits the wallet), lock, settle
-MARKET=$(curl -s -X POST localhost:5103/markets -H 'Content-Type: application/json' \
-  -d '{"title":"MI vs CSK","eventStartAt":"2027-03-20T14:00:00Z","outcomes":["MI","CSK"]}')
-echo "$MARKET"
-# ... take the market id + outcome ids from the response, then:
-curl -s -X POST localhost:5201/pools/<marketId>/stakes -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' -d '{"outcomeId":"<outcomeId>","amount":100}'
-curl -s localhost:5102/wallet/me/balance -H "Authorization: Bearer $TOKEN"  # dropped by 100
-curl -s -X POST localhost:5103/markets/<marketId>/lock
-curl -s -X POST localhost:5201/pools/<marketId>/settle -H 'Content-Type: application/json' -d '{"winningOutcomeId":"<outcomeId>"}'
-curl -s -X POST localhost:5103/markets/<marketId>/settle -H 'Content-Type: application/json' -d '{"winningOutcomeId":"<outcomeId>"}'
+curl -s -X POST localhost:5100/markets -H 'Content-Type: application/json' \
+  -d '{"title":"MI vs CSK","eventStartAt":"2027-03-20T14:00:00Z","outcomes":["MI","CSK"]}'
+# Use the returned market and outcome IDs below, and keep this key for retries.
+STAKE_KEY=$(python3 -c 'import uuid;print(uuid.uuid4())')
+curl -s -X POST localhost:5100/pools/<marketId>/stakes \
+  -H "Authorization: Bearer $TOKEN" -H "Idempotency-Key: $STAKE_KEY" \
+  -H 'Content-Type: application/json' -d '{"outcomeId":"<outcomeId>","amount":10}'
+curl -s localhost:5100/wallet/me/balance -H "Authorization: Bearer $TOKEN"
+curl -s -X POST localhost:5100/markets/<marketId>/lock
+# This computes a ratio; it does not pay winners.
+curl -s -X POST localhost:5100/pools/<marketId>/settle \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"winningOutcomeId":"<outcomeId>"}'
 ```
 
-## Migrations
+## Migrations and checks
 
-Each .NET service uses real EF Core migrations (not `EnsureCreated`) — the
-`ravex` database already exists (it's shared with `apps/web`), so
-`EnsureCreated` silently no-ops instead of creating the service's tables.
-Each service's migration history lives in its own schema
-(`identity.__ef_migrations_history`, etc.) so they can't collide with each
-other or with `apps/web`'s Drizzle migrations.
+.NET services apply EF migrations on startup, with separate migration history
+per schema. Add an EF migration using the matching Infrastructure project and
+Api startup project; pin `dotnet-ef` to version `8.0.10`. Settlement embeds
+ordered SQL migrations from `internal/store/migrations`; it applies unapplied
+files at startup under a database advisory lock and records them in
+`settlement.schema_migrations`.
 
-To add a migration after changing an entity, from the repo root:
+Run the full isolated integration suite with Docker and Python 3:
 
 ```bash
-docker run --rm -v "$(pwd)":/src -w /src/services/<service-name> mcr.microsoft.com/dotnet/sdk:8.0 bash -c '
-  dotnet tool install --global dotnet-ef --version 8.* && export PATH="$PATH:/root/.dotnet/tools"
-  dotnet ef migrations add <Name> --project <Service>.Infrastructure/<Service>.Infrastructure.csproj --startup-project <Service>.Api/<Service>.Api.csproj -o Migrations
-'
+python3 services/tests/stake_lifecycle.py
 ```
 
-Migrations apply automatically on container start (`db.Database.Migrate()` in
-each `Program.cs`).
+It builds a separate Compose project with temporary PostgreSQL storage and
+random localhost ports, runs real HTTP and PostgreSQL tests, then removes its
+containers. It never restarts the development stack. Tests cover duplicate
+stakes, conflicting keys, overspend races, concurrent reward claims, service
+authorization, pending debits, response-loss recovery, market admission races,
+restart persistence, and ledger reconciliation.
 
-## Known gaps (next steps, not yet built)
+Fast Go checks (PostgreSQL tests skip unless `TEST_DATABASE_URL` is set):
 
-- Market Catalog has no auth on writes (admin auth isn't built yet) — the
-  gateway matches that rather than being stricter than the backend.
-- Settlement Engine's pools are still in-memory only — they reset on restart.
-  Staking is wired to Wallet (see above), but **settlement isn't** — a
-  winning payout is computed and returned, but nothing credits it back to
-  winners' balances yet, and Settlement Engine doesn't track *which* user
-  staked what (only aggregate totals per outcome), so that's the next piece,
-  not just a wiring gap.
-- No event bus wiring yet — NATS is running but nothing publishes to it.
+```bash
+docker run --rm -v "$PWD/services/settlement-engine:/src" -w /src golang:1.22-alpine sh -c 'go test ./... && go vet ./...'
+npm run typecheck --workspace=@ravex/platform
+```
+
+## Remaining product gaps
+
+- Catalog writes still lack admin authorization. Pool ratio computation
+  requires a player token but has no admin role requirement. Admin roles and
+  a trusted result workflow are required before exposing payout operations.
+- Pool settlement computes ratios only. Wallet winner credits, cancellation
+  refunds, deterministic rounding, and durable payout plans remain to build.
+- Ad/referral earn reasons are accepted from the caller without independent
+  event verification. Rate limits and operational monitoring are not built.
+- Historical in-memory pools are not migrated automatically. Prediction
+  history UI and result audit records remain on the roadmap.

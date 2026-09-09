@@ -10,10 +10,12 @@ var (
 	ErrUnauthorized        = errors.New("unauthorized")
 )
 
-// WalletClient is the port to the Wallet service. A stake must debit a real
-// balance before it counts toward a pool — this is called synchronously,
-// before AddStake, so an unbacked stake never enters the pool in the first
-// place instead of needing to be reversed later.
 type WalletClient interface {
-	DebitStake(ctx context.Context, bearerToken, marketID, outcomeID string, amount int64) error
+	// Returns a saved terminal decision, including insufficient balance.
+	// Transport failures are ambiguous and must leave the stake pending.
+	DebitStake(context.Context, Stake) error
+}
+
+type IdentityClient interface {
+	CurrentUser(context.Context, string) (string, error)
 }

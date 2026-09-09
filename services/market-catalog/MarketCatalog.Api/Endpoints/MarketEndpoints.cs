@@ -37,6 +37,14 @@ public static class MarketEndpoints
         {
             return Results.Ok(await action());
         }
+        catch (PendingStakesException ex)
+        {
+            return Results.Conflict(new { error = ex.Message });
+        }
+        catch (StakeAdmissionUnavailableException ex)
+        {
+            return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+        }
         catch (MarketNotFoundException ex)
         {
             return Results.NotFound(new { error = ex.Message });
@@ -60,6 +68,14 @@ public static class MarketEndpoints
         try
         {
             return await action();
+        }
+        catch (PendingStakesException ex)
+        {
+            return Results.Conflict(new { error = ex.Message });
+        }
+        catch (StakeAdmissionUnavailableException ex)
+        {
+            return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
         }
         catch (MarketNotFoundException ex)
         {

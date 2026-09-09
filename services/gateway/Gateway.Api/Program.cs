@@ -4,6 +4,13 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var platformOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+    ?? new[] { "http://localhost:3001" };
+builder.Services.AddCors(options => options.AddPolicy("platform", policy => policy
+    .WithOrigins(platformOrigins)
+    .WithMethods("GET", "POST")
+    .WithHeaders("Content-Type", "Authorization", "Idempotency-Key")));
+
 var jwtSigningKey = builder.Configuration["JWT_SIGNING_KEY"] ?? "dev-only-signing-key-change-me-please-32bytes!";
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -35,6 +42,7 @@ builder.Services.AddReverseProxy()
 
 var app = builder.Build();
 
+app.UseCors("platform");
 app.UseAuthentication();
 app.UseAuthorization();
 

@@ -1,4 +1,6 @@
 using MarketCatalog.Application.UseCases;
+using MarketCatalog.Application.Abstractions;
+using MarketCatalog.Infrastructure.Settlement;
 using MarketCatalog.Domain.Repositories;
 using MarketCatalog.Infrastructure.Persistence;
 using MarketCatalog.Infrastructure.Persistence.Repositories;
@@ -20,6 +22,7 @@ public static class DependencyInjection
             npgsql => npgsql.MigrationsHistoryTable("__ef_migrations_history", "market_catalog")));
 
         services.AddScoped<IMarketRepository, MarketRepository>();
+        services.AddSingleton<IStakeAdmission, HttpStakeAdmission>();
 
         services.AddScoped<IListMarketsUseCase, ListMarketsUseCase>();
         services.AddScoped<IGetMarketUseCase, GetMarketUseCase>();

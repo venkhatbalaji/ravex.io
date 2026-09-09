@@ -28,23 +28,6 @@ public static class WalletEndpoints
             }
         });
 
-        group.MapPost("/stake", async (PlaceStakeRequest request, ClaimsPrincipal principal, IPlaceStakeUseCase useCase) =>
-        {
-            try
-            {
-                var result = await useCase.ExecuteAsync(CurrentUserId(principal), request);
-                return Results.Ok(result);
-            }
-            catch (InvalidStakeAmountException ex)
-            {
-                return Results.BadRequest(new { error = ex.Message });
-            }
-            catch (InsufficientBalanceException ex)
-            {
-                return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status402PaymentRequired);
-            }
-        });
-
         group.MapGet("/balance", async (ClaimsPrincipal principal, IGetBalanceUseCase useCase) =>
             Results.Ok(await useCase.ExecuteAsync(CurrentUserId(principal))));
 

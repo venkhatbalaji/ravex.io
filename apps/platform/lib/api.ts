@@ -51,6 +51,18 @@ export interface PoolSnapshot {
   totalPool: number;
 }
 
+export interface StakeSubmission extends PoolSnapshot {
+  stake: {
+    id: string;
+    marketId: string;
+    outcomeId: string;
+    amount: number;
+    state: "pending" | "accepted" | "rejected";
+    createdAt: string;
+    updatedAt: string;
+  };
+}
+
 export interface SettlementResult {
   marketId: string;
   winningOutcomeId: string;
@@ -102,15 +114,15 @@ export const api = {
     }),
 
   pool: (marketId: string) => request<PoolSnapshot>(`/pools/${marketId}`),
-  stake: (token: string, marketId: string, outcomeId: string, amount: number) =>
-    request<PoolSnapshot>(
+  stake: (token: string, marketId: string, outcomeId: string, amount: number, idempotencyKey: string) =>
+    request<StakeSubmission>(
       `/pools/${marketId}/stakes`,
-      { method: "POST", body: JSON.stringify({ outcomeId, amount }) },
+      { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: JSON.stringify({ outcomeId, amount }) },
       token,
     ),
-  settlePool: (marketId: string, winningOutcomeId: string) =>
+  settlePool: (token: string, marketId: string, winningOutcomeId: string) =>
     request<SettlementResult>(`/pools/${marketId}/settle`, {
       method: "POST",
       body: JSON.stringify({ winningOutcomeId }),
-    }),
+    }, token),
 };

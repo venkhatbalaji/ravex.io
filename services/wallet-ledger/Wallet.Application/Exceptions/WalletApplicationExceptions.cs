@@ -22,6 +22,11 @@ public sealed class InvalidStakeAmountException : WalletApplicationException
     public InvalidStakeAmountException() : base("Stake amount must be positive.") { }
 }
 
+public sealed class StakeConflictException : WalletApplicationException
+{
+    public StakeConflictException() : base("The stake ID was already used with a different payload.") { }
+}
+
 public sealed class InsufficientBalanceException : WalletApplicationException
 {
     public InsufficientBalanceException(long balance, long requested)

@@ -23,6 +23,8 @@ public static class DependencyInjection
 
         services.AddScoped<IAccountRepository, AccountRepository>();
         services.AddScoped<ILedgerRepository, LedgerRepository>();
+        services.AddScoped<IStakeDebitRepository, StakeDebitRepository>();
+        services.AddScoped<IWalletTransaction, WalletTransaction>();
         services.AddSingleton<IEarnRateCatalog, StaticEarnRateCatalog>();
 
         services.AddScoped<IEarnCoinsUseCase, EarnCoinsUseCase>();

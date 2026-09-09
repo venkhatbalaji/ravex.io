@@ -1,4 +1,6 @@
 using MarketCatalog.Application.Contracts;
+using MarketCatalog.Application.Abstractions;
+using MarketCatalog.Domain.Entities;
 using MarketCatalog.Application.Exceptions;
 using MarketCatalog.Domain.Repositories;
 
@@ -12,13 +14,19 @@ public interface ILockMarketUseCase
 public sealed class LockMarketUseCase : ILockMarketUseCase
 {
     private readonly IMarketRepository _markets;
+    private readonly IStakeAdmission _admission;
 
-    public LockMarketUseCase(IMarketRepository markets) => _markets = markets;
+    public LockMarketUseCase(IMarketRepository markets, IStakeAdmission admission)
+    {
+        _markets = markets;
+        _admission = admission;
+    }
 
     public async Task<MarketDto> ExecuteAsync(Guid id, CancellationToken ct = default)
     {
         var market = await _markets.GetByIdAsync(id, ct) ?? throw new MarketNotFoundException(id);
-        market.Lock();
+        if (market.Status != MarketStatus.Locked) market.Lock();
+        await _admission.CloseAsync(id, ct);
         await _markets.SaveChangesAsync(ct);
         return MarketDto.From(market);
     }

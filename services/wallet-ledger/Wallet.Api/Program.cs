@@ -9,6 +9,9 @@ using Wallet.Infrastructure;
 using Wallet.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
+var serviceKey = builder.Configuration["INTERNAL_SERVICE_KEY"];
+if (string.IsNullOrWhiteSpace(serviceKey) || serviceKey.Length < 32)
+    throw new InvalidOperationException("INTERNAL_SERVICE_KEY must contain at least 32 characters.");
 
 builder.Services.AddWalletInfrastructure(builder.Configuration);
 
@@ -69,5 +72,6 @@ app.UseAuthorization();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "wallet-ledger" }));
 app.MapWalletEndpoints();
+app.MapInternalStakeEndpoints(serviceKey);
 
 app.Run();

@@ -9,6 +9,7 @@ public sealed class WalletDbContext : DbContext
 
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
+    public DbSet<StakeDebit> StakeDebits => Set<StakeDebit>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

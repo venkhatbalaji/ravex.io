@@ -54,6 +54,7 @@ services:
     ports:
       - "5102:8080"
     environment:
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:-dev-only-internal-service-key-change-me!}
       WALLET_DB_CONNECTION: "Host=postgres;Port=5432;Database=ravex;Username=ravex;Password=ravex_dev;Search Path=wallet"
       JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:-dev-only-signing-key-change-me-please-32bytes!}
     depends_on:
@@ -67,6 +68,8 @@ services:
     ports:
       - "5103:8080"
     environment:
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:-dev-only-internal-service-key-change-me!}
+      SETTLEMENT_SERVICE_URL: "http://settlement-engine:8080"
       MARKET_CATALOG_DB_CONNECTION: "Host=postgres;Port=5432;Database=ravex;Username=ravex;Password=ravex_dev;Search Path=market_catalog"
     depends_on:
       postgres:
@@ -78,8 +81,19 @@ services:
       - "5201:8080"
     environment:
       WALLET_SERVICE_URL: "http://wallet-ledger:8080"
+      IDENTITY_SERVICE_URL: "http://identity:8080"
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:-dev-only-internal-service-key-change-me!}
+      SETTLEMENT_DB_CONNECTION: "postgres://ravex:ravex_dev@postgres:5432/ravex?sslmode=disable"
+      MARKET_CATALOG_SERVICE_URL: "http://market-catalog:8080"
     depends_on:
-      - wallet-ledger
+      postgres:
+        condition: service_healthy
+      identity:
+        condition: service_started
+      wallet-ledger:
+        condition: service_started
+      market-catalog:
+        condition: service_started
 
   gateway:
     build:
@@ -97,4 +111,3 @@ services:
 
 volumes:
   ravex_postgres:
-
