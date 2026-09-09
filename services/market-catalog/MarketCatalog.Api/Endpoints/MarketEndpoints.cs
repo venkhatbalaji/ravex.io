@@ -22,13 +22,13 @@ public static class MarketEndpoints
             {
                 var market = await useCase.ExecuteAsync(request);
                 return Results.Created($"/markets/{market.Id}", market);
-            }));
+            })).RequireAuthorization("admin");
 
         group.MapPost("/{id:guid}/lock", async (Guid id, ILockMarketUseCase useCase) =>
-            await Try(() => useCase.ExecuteAsync(id)));
+            await Try(() => useCase.ExecuteAsync(id))).RequireAuthorization("admin");
 
         group.MapPost("/{id:guid}/settle", async (Guid id, SettleMarketRequest request, ISettleMarketUseCase useCase) =>
-            await Try(() => useCase.ExecuteAsync(id, request)));
+            await Try(() => useCase.ExecuteAsync(id, request))).RequireAuthorization("admin");
     }
 
     private static async Task<IResult> Try(Func<Task<MarketDto>> action)
@@ -48,6 +48,10 @@ public static class MarketEndpoints
         catch (MarketNotFoundException ex)
         {
             return Results.NotFound(new { error = ex.Message });
+        }
+        catch (CategoryNotFoundException ex)
+        {
+            return Results.BadRequest(new { error = ex.Message });
         }
         catch (InvalidMarketDefinitionException ex)
         {
@@ -80,6 +84,10 @@ public static class MarketEndpoints
         catch (MarketNotFoundException ex)
         {
             return Results.NotFound(new { error = ex.Message });
+        }
+        catch (CategoryNotFoundException ex)
+        {
+            return Results.BadRequest(new { error = ex.Message });
         }
         catch (InvalidMarketDefinitionException ex)
         {

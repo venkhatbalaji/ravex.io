@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Branding.Domain\Branding.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

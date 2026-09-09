@@ -44,7 +44,8 @@ public static class AuthEndpoints
         app.MapGet("/me", (ClaimsPrincipal principal) => Results.Ok(new
         {
             id = principal.FindFirstValue(ClaimTypes.NameIdentifier),
-            email = principal.FindFirstValue(ClaimTypes.Email)
+            email = principal.FindFirstValue(ClaimTypes.Email),
+            role = principal.FindFirstValue(ClaimTypes.Role)
         })).RequireAuthorization();
     }
 }

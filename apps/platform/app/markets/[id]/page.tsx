@@ -7,6 +7,7 @@ import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/context/auth-context";
 import { OddsBar } from "@/components/odds-bar";
 import { StatusBadge } from "@/components/status-badge";
+import { useCopy } from "@/context/branding-context";
 
 interface StakeAttempt {
   key: string;
@@ -19,6 +20,9 @@ export default function MarketDetailPage() {
   const id = params.id;
   const queryClient = useQueryClient();
   const { token, user, isAuthenticated } = useAuth();
+  const stakeHeading = useCopy("market.stakeHeading", "Place a stake");
+  const stakeLoginPrompt = useCopy("market.stakeLoginPrompt", "Log in to stake — this debits your wallet for real.");
+  const stakeButtonLabel = useCopy("market.stakeButton", "Stake");
   const [outcomeId, setOutcomeId] = useState("");
   const [amount, setAmount] = useState(10);
   const [error, setError] = useState<string | null>(null);
@@ -103,26 +107,6 @@ export default function MarketDetailPage() {
     }
   }
 
-  async function lock() {
-    try {
-      await api.lockMarket(market!.id);
-      queryClient.invalidateQueries({ queryKey: ["market", id] });
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not lock the market.");
-    }
-  }
-
-  async function settle(winningOutcomeId: string) {
-    if (!token) { setError("Log in to compute settlement."); return; }
-    try {
-      await api.settlePool(token, market!.id, winningOutcomeId);
-      await api.settleMarket(market!.id, winningOutcomeId);
-      queryClient.invalidateQueries({ queryKey: ["market", id] });
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not compute settlement.");
-    }
-  }
-
   return (
     <div className="space-y-8">
       <div data-reveal className="space-y-3">
@@ -141,8 +125,8 @@ export default function MarketDetailPage() {
           data-reveal
           className="max-w-sm space-y-4 rounded-xl border border-border bg-surface p-5"
         >
-          <h2 className="font-display text-lg font-medium text-fg">Place a stake</h2>
-          {!isAuthenticated && <p className="text-xs text-muted">Log in to stake — this debits your wallet for real.</p>}
+          <h2 className="font-display text-lg font-medium text-fg">{stakeHeading}</h2>
+          {!isAuthenticated && <p className="text-xs text-muted">{stakeLoginPrompt}</p>}
           <label className="block space-y-1.5 text-xs text-muted">
             <span className="uppercase tracking-wider">Outcome</span>
             <select
@@ -180,42 +164,13 @@ export default function MarketDetailPage() {
             disabled={isSubmitting || !isAuthenticated}
             className="glow-accent w-full rounded-full bg-accent px-5 py-2.5 text-xs font-semibold text-accent-fg transition hover:opacity-90 active:scale-[0.98]"
           >
-            {isSubmitting ? "Checking…" : pendingAttempt ? "Check prediction" : "Stake"}
+            {isSubmitting ? "Checking…" : pendingAttempt ? "Check prediction" : stakeButtonLabel}
           </button>
         </form>
       )}
 
       {message && <p role="status" className="text-xs text-accent-text">{message}</p>}
       {error && <p role="alert" className="text-xs text-danger">{error}</p>}
-
-      {market.status === "open" && (
-        <div data-reveal className="max-w-sm space-y-3 rounded-xl border border-dashed border-border-strong bg-surface p-5">
-          <p className="text-xs text-muted">Admin — no auth yet on these either.</p>
-          <button
-            onClick={lock}
-            className="rounded-full border border-border-strong px-4 py-1.5 text-xs text-muted transition hover:border-accent/40 hover:text-fg"
-          >
-            Lock market
-          </button>
-        </div>
-      )}
-
-      {market.status === "locked" && (
-        <div data-reveal className="max-w-sm space-y-3 rounded-xl border border-dashed border-border-strong bg-surface p-5">
-          <p className="text-xs text-muted">Admin — settle by picking the winning outcome.</p>
-          <div className="flex flex-wrap gap-2">
-            {market.outcomes.map((o) => (
-              <button
-                key={o.id}
-                onClick={() => settle(o.id)}
-                className="glow-accent rounded-full bg-accent px-4 py-1.5 text-xs font-semibold text-accent-fg transition hover:opacity-90"
-              >
-                {o.label} wins
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

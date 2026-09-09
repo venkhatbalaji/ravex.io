@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/auth-context";
+import { useCopy } from "@/context/branding-context";
 import { ApiError } from "@/lib/api";
 
 const fieldClass =
@@ -12,6 +13,8 @@ const fieldClass =
 export default function RegisterPage() {
   const { register } = useAuth();
   const router = useRouter();
+  const heading = useCopy("auth.registerHeading", "Create an account");
+  const haveAccount = useCopy("auth.haveAccount", "Already have an account?");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -34,7 +37,7 @@ export default function RegisterPage() {
 
   return (
     <div data-reveal className="mx-auto max-w-sm space-y-6 py-10">
-      <h1 className="font-display text-3xl font-semibold text-fg">Create an account</h1>
+      <h1 className="font-display text-3xl font-semibold text-fg">{heading}</h1>
       <form onSubmit={handleSubmit} className="space-y-5">
         <label className="block space-y-1.5 text-xs uppercase tracking-wider text-muted">
           Display name
@@ -65,7 +68,7 @@ export default function RegisterPage() {
         </button>
       </form>
       <p className="text-xs text-muted">
-        Already have an account?{" "}
+        {haveAccount}{" "}
         <Link href="/login" className="text-accent-text">
           Log in
         </Link>

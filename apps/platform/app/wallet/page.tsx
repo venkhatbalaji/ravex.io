@@ -5,17 +5,20 @@ import { useState } from "react";
 import { useAuth } from "@/context/auth-context";
 import { api, ApiError } from "@/lib/api";
 import { useCountUp } from "@/components/use-count-up";
-
-const EARN_REASONS = [
-  { key: "daily_login", label: "Daily login bonus", amount: 50 },
-  { key: "rewarded_ad", label: "Watch a rewarded ad", amount: 20 },
-  { key: "referral", label: "Referral bonus", amount: 100 },
-];
+import { useCopy } from "@/context/branding-context";
 
 export default function WalletPage() {
   const { token } = useAuth();
   const queryClient = useQueryClient();
   const [message, setMessage] = useState<string | null>(null);
+
+  const heading = useCopy("wallet.heading", "Wallet");
+  const recentActivity = useCopy("wallet.recentActivity", "Recent activity");
+  const EARN_REASONS = [
+    { key: "daily_login", label: useCopy("wallet.earnDailyLogin", "Daily login bonus"), amount: 50 },
+    { key: "rewarded_ad", label: useCopy("wallet.earnRewardedAd", "Watch a rewarded ad"), amount: 20 },
+    { key: "referral", label: useCopy("wallet.earnReferral", "Referral bonus"), amount: 100 },
+  ];
 
   const { data: balance } = useQuery({
     queryKey: ["balance", token],
@@ -44,7 +47,7 @@ export default function WalletPage() {
   return (
     <div className="space-y-10">
       <div data-reveal className="space-y-1">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted">Wallet</p>
+        <p className="text-xs uppercase tracking-[0.2em] text-muted">{heading}</p>
         <p className="font-display font-mono text-5xl font-semibold tabular-nums text-fg">
           {displayBalance} <span className="font-body text-lg font-normal text-muted">coins</span>
         </p>
@@ -64,7 +67,7 @@ export default function WalletPage() {
       {message && <p className="text-xs text-accent-text">{message}</p>}
 
       <div data-reveal className="space-y-3">
-        <h2 className="font-display text-lg font-medium text-fg">Recent activity</h2>
+        <h2 className="font-display text-lg font-medium text-fg">{recentActivity}</h2>
         <div className="overflow-hidden rounded-xl border border-border">
           <table className="w-full text-sm">
             <thead>

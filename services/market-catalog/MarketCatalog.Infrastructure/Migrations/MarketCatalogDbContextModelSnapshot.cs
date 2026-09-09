@@ -23,10 +23,34 @@ namespace MarketCatalog.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("MarketCatalog.Domain.Entities.Category", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("categories", "market_catalog");
+                });
+
             modelBuilder.Entity("MarketCatalog.Domain.Entities.Market", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CategoryId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAt")
@@ -52,6 +76,8 @@ namespace MarketCatalog.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CategoryId");
+
                     b.ToTable("markets", "market_catalog");
                 });
 
@@ -73,6 +99,14 @@ namespace MarketCatalog.Infrastructure.Migrations
                     b.HasIndex("MarketId");
 
                     b.ToTable("outcomes", "market_catalog");
+                });
+
+            modelBuilder.Entity("MarketCatalog.Domain.Entities.Market", b =>
+                {
+                    b.HasOne("MarketCatalog.Domain.Entities.Category", null)
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("MarketCatalog.Domain.Entities.Outcome", b =>

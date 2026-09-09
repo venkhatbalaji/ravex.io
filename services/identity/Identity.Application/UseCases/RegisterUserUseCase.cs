@@ -34,6 +34,6 @@ public sealed class RegisterUserUseCase : IRegisterUserUseCase
         var user = User.Register(email, request.DisplayName ?? string.Empty, _passwordHasher.Hash(request.Password));
         await _users.AddAsync(user, ct);
 
-        return new UserSummary(user.Id, user.Email, user.DisplayName);
+        return new UserSummary(user.Id, user.Email, user.DisplayName, user.Role.ToString());
     }
 }

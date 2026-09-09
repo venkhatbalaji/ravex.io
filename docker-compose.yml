@@ -43,6 +43,9 @@ services:
     environment:
       IDENTITY_DB_CONNECTION: "Host=postgres;Port=5432;Database=ravex;Username=ravex;Password=ravex_dev;Search Path=identity"
       JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:-dev-only-signing-key-change-me-please-32bytes!}
+      # The only way an Admin account gets created — see services/README.md.
+      ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_BOOTSTRAP_EMAIL:-admin@predictplay.local}
+      ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:-dev-only-admin-password-change-me!}
     depends_on:
       postgres:
         condition: service_healthy
@@ -95,6 +98,19 @@ services:
       market-catalog:
         condition: service_started
 
+  branding:
+    build:
+      context: .
+      dockerfile: services/branding/Dockerfile
+    ports:
+      - "5104:8080"
+    environment:
+      BRANDING_DB_CONNECTION: "Host=postgres;Port=5432;Database=ravex;Username=ravex;Password=ravex_dev;Search Path=branding"
+      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:-dev-only-signing-key-change-me-please-32bytes!}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   gateway:
     build:
       context: .
@@ -108,6 +124,7 @@ services:
       - wallet-ledger
       - market-catalog
       - settlement-engine
+      - branding
 
 volumes:
   ravex_postgres:

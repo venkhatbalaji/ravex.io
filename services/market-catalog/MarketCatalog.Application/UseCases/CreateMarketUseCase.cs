@@ -1,4 +1,5 @@
 using MarketCatalog.Application.Contracts;
+using MarketCatalog.Application.Exceptions;
 using MarketCatalog.Domain.Entities;
 using MarketCatalog.Domain.Repositories;
 
@@ -12,12 +13,21 @@ public interface ICreateMarketUseCase
 public sealed class CreateMarketUseCase : ICreateMarketUseCase
 {
     private readonly IMarketRepository _markets;
+    private readonly ICategoryRepository _categories;
 
-    public CreateMarketUseCase(IMarketRepository markets) => _markets = markets;
+    public CreateMarketUseCase(IMarketRepository markets, ICategoryRepository categories)
+    {
+        _markets = markets;
+        _categories = categories;
+    }
 
     public async Task<MarketDto> ExecuteAsync(CreateMarketRequest request, CancellationToken ct = default)
     {
-        var market = Market.Create(request.Title, request.Description ?? string.Empty, request.EventStartAt, request.Outcomes);
+        if (request.CategoryId is { } categoryId && !await _categories.ExistsAsync(categoryId, ct))
+            throw new CategoryNotFoundException(categoryId);
+
+        var market = Market.Create(
+            request.Title, request.Description ?? string.Empty, request.EventStartAt, request.Outcomes, request.CategoryId);
         await _markets.AddAsync(market, ct);
         return MarketDto.From(market);
     }

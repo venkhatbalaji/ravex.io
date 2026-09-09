@@ -19,3 +19,8 @@ public sealed class UnknownOutcomeException : MarketDomainException
 {
     public UnknownOutcomeException(Guid outcomeId) : base($"'{outcomeId}' is not an outcome of this market.") { }
 }
+
+public sealed class InvalidCategoryDefinitionException : MarketDomainException
+{
+    public InvalidCategoryDefinitionException(string message) : base(message) { }
+}

@@ -22,19 +22,23 @@ For the product implementation sequence and acceptance criteria, see the
 [prediction product roadmap](docs/prediction-roadmap.md).
 
 - `apps/web` — Next.js marketing site, inquiry API, and the authenticated chat agent
-- `apps/platform` — the prediction-market product itself: Next.js + Tailwind, talks only to the gateway at `:5100` — see below
-- `services` — prediction-market backend: `gateway` (YARP), `identity`, `wallet-ledger`, `market-catalog` (.NET 8, Clean Architecture) and `settlement-engine` (Go) — see `services/README.md`
+- `apps/platform` — the prediction-market product itself: Next.js + Tailwind, talks only to the gateway at `:5100`, reads its theme/copy from `branding` at runtime — see below
+- `apps/admin` — the operator tool: markets, categories, and branding, admin-role-gated — see [docs/admin-and-white-label.md](docs/admin-and-white-label.md)
+- `services` — prediction-market backend: `gateway` (YARP), `identity`, `wallet-ledger`, `market-catalog`, `branding` (.NET 8, Clean Architecture) and `settlement-engine` (Go) — see `services/README.md`
 - `infra/postgres` — local database bootstrap (the `inquiries` table for `apps/web`, plus per-service schemas for `services/*`)
 - `packages` — reserved for shared contracts, UI and configuration as services are added
 
-Run the backend services with `docker compose up -d --build` (see `services/README.md` for the golden-path walkthrough and ports), then run the product frontend natively — same pattern as `apps/web`, for proper hot-reload:
+Run the backend services with `docker compose up -d --build` (see `services/README.md` for the golden-path walkthrough and ports), then run the frontends natively — same pattern as `apps/web`, for proper hot-reload:
 
 ```bash
 cp apps/platform/.env.example apps/platform/.env.local
-npm run dev:platform
+npm run dev:platform   # player app — http://localhost:3001
+
+cp apps/admin/.env.example apps/admin/.env.local
+npm run dev:admin      # admin app — http://localhost:3002, needs an Admin account (see docs/admin-and-white-label.md)
 ```
 
-Open http://localhost:3001 (`apps/web` already owns :3000, so `platform` runs alongside it on :3001 rather than colliding). Register an account, then visit `/wallet` to earn free coins and `/` to create a market and place a stake — every action there is real: it debits your actual wallet balance through the gateway, not a mock.
+`apps/web` already owns `:3000`, so `platform` and `admin` run alongside it on `:3001`/`:3002` rather than colliding. Register an account in the player app, then visit `/wallet` to earn free coins — every action there is real: it debits your actual wallet balance through the gateway, not a mock. Creating, locking, and settling markets now happens in `apps/admin`, not the player app.
 
 ## Database migrations
 

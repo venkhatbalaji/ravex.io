@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-inter-loaded), system-ui, sans-serif;
+  --font-mono: var(--font-mono-loaded), ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+/* Deliberately not the product's own brand palette — this is the tool an
+   operator uses to configure that brand, so it gets its own fixed, neutral,
+   professional look. Dark is the default, same as the player app. */
+:root {
+  --bg: #0f1115;
+  --surface: #16191f;
+  --surface-2: #1c2028;
+  --border: #262b34;
+  --border-strong: #333944;
+  --fg: #e8eaed;
+  --muted: #8b93a1;
+  --accent: #6366f1;
+  --accent-fg: #ffffff;
+  --danger: #f87171;
+}
+
+:root[data-theme="light"] {
+  --bg: #f8f9fb;
+  --surface: #ffffff;
+  --surface-2: #eef0f3;
+  --border: #dde1e6;
+  --border-strong: #c7ccd4;
+  --fg: #14171c;
+  --muted: #5b6472;
+  --accent: #4f46e5;
+  --accent-fg: #ffffff;
+  --danger: #dc2626;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-fg);
+}

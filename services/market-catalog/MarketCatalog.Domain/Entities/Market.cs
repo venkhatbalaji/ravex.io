@@ -12,6 +12,7 @@ public class Market
     public DateTimeOffset EventStartAt { get; private set; }
     public MarketStatus Status { get; private set; }
     public Guid? WinningOutcomeId { get; private set; }
+    public Guid? CategoryId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public IReadOnlyList<Outcome> Outcomes => _outcomes;
 
@@ -20,7 +21,12 @@ public class Market
         // required by EF Core for materialization
     }
 
-    public static Market Create(string title, string description, DateTimeOffset eventStartAt, IReadOnlyList<string> outcomeLabels)
+    public static Market Create(
+        string title,
+        string description,
+        DateTimeOffset eventStartAt,
+        IReadOnlyList<string> outcomeLabels,
+        Guid? categoryId = null)
     {
         if (string.IsNullOrWhiteSpace(title))
             throw new InvalidMarketDefinitionException("A market needs a title.");
@@ -34,6 +40,7 @@ public class Market
             Description = description,
             EventStartAt = eventStartAt,
             Status = MarketStatus.Open,
+            CategoryId = categoryId,
             CreatedAt = DateTimeOffset.UtcNow
         };
 

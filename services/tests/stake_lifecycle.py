@@ -15,6 +15,8 @@ import uuid
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 KEY = "integration-only-service-key-32-characters"
+ADMIN_EMAIL = "admin@integration.test"
+ADMIN_PASSWORD = "integration-only-admin-password-123"
 
 
 def main():
@@ -67,6 +69,9 @@ def main():
             command("up", "-d", "--build")
         gateway, wallet, settlement = map(endpoint, ["gateway", "wallet-ledger", "settlement-engine"])
         eventually(lambda: call(gateway, "/markets")[0] == 200 and call(wallet, "/health")[0] == 200 and call(settlement, "/health")[0] == 200, "services did not become ready")
+        # Identity's controlled bootstrap (ADMIN_BOOTSTRAP_EMAIL/PASSWORD in compose.yml)
+        # is the only way this token exists — market create/lock/settle are admin-only.
+        admin_token = expect(call(gateway, "/auth/login", {"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD}), 200)["accessToken"]
 
         def player():
             email = f"stakes-{uuid.uuid4().hex}@example.test"
@@ -76,7 +81,10 @@ def main():
 
         def market():
             future = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=2)).isoformat()
-            return expect(call(gateway, "/markets", {"title": "Durable stake test", "eventStartAt": future, "outcomes": ["Home", "Away"]}), 201)
+            return expect(call(gateway, "/markets", {"title": "Durable stake test", "eventStartAt": future, "outcomes": ["Home", "Away"]}, admin_token), 201)
+
+        def lock(market_id):
+            return call(gateway, f"/markets/{market_id}/lock", {}, admin_token)
 
         def predict(token, item, key, amount=10):
             return call(gateway, f'/pools/{item["id"]}/stakes', {"outcomeId": item["outcomes"][0]["id"], "amount": amount}, token, {"Idempotency-Key": key})
@@ -126,7 +134,7 @@ def main():
         assert expect(call(gateway, f'/pools/{item["id"]}'), 200)["totalPool"] == 10
         expect(predict(token, item, key, 11), 409)
         expect(predict(token, market(), key), 409)
-        expect(call(gateway, f'/markets/{item["id"]}/lock', {}), 200)
+        expect(lock(item["id"]), 200)
         expect(predict(token, item, key), 200)
         expect(predict(token, item, str(uuid.uuid4())), 409)
         print("PASS: duplicate admission, payload conflicts, and replay after closure", flush=True)
@@ -171,11 +179,11 @@ def main():
         command("stop", "wallet-ledger")
         pending = expect(predict(recovery_token, outage_market, outage_key), 202)
         assert pending["stake"]["state"] == "pending"
-        expect(call(gateway, f'/markets/{outage_market["id"]}/lock', {}), 409)
+        expect(lock(outage_market["id"]), 409)
         expect(predict(recovery_token, outage_market, str(uuid.uuid4())), 409)
         command("start", "wallet-ledger")
         eventually(lambda: predict(recovery_token, outage_market, outage_key)[0] == 200, "pending stake not recovered after wallet outage")
-        expect(call(gateway, f'/markets/{outage_market["id"]}/lock', {}), 200)
+        expect(lock(outage_market["id"]), 200)
         assert balance(recovery_token) == 130
         command("restart", "settlement-engine", "wallet-ledger")
         eventually(lambda: predict(recovery_token, outage_market, outage_key)[0] == 200 and balance(recovery_token) == 130, "restart lost durable result")

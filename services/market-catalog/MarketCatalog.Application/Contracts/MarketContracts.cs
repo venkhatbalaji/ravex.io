@@ -2,7 +2,7 @@ using MarketCatalog.Domain.Entities;
 
 namespace MarketCatalog.Application.Contracts;
 
-public record CreateMarketRequest(string Title, string? Description, DateTimeOffset EventStartAt, List<string> Outcomes);
+public record CreateMarketRequest(string Title, string? Description, DateTimeOffset EventStartAt, List<string> Outcomes, Guid? CategoryId = null);
 public record SettleMarketRequest(Guid WinningOutcomeId);
 
 public record OutcomeDto(Guid Id, string Label)
@@ -17,6 +17,7 @@ public record MarketDto(
     DateTimeOffset EventStartAt,
     string Status,
     Guid? WinningOutcomeId,
+    Guid? CategoryId,
     IReadOnlyList<OutcomeDto> Outcomes)
 {
     public static MarketDto From(Market market) => new(
@@ -26,5 +27,6 @@ public record MarketDto(
         market.EventStartAt,
         market.Status.ToString().ToLowerInvariant(),
         market.WinningOutcomeId,
+        market.CategoryId,
         market.Outcomes.Select(OutcomeDto.From).ToList());
 }

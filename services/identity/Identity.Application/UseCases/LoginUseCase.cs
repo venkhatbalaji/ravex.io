@@ -31,6 +31,6 @@ public sealed class LoginUseCase : ILoginUseCase
             throw new InvalidCredentialsException();
 
         var token = _tokenIssuer.IssueAccessToken(user);
-        return new AuthenticatedResult(token, new UserSummary(user.Id, user.Email, user.DisplayName));
+        return new AuthenticatedResult(token, new UserSummary(user.Id, user.Email, user.DisplayName, user.Role.ToString()));
     }
 }

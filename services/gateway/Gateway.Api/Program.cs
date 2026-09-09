@@ -5,10 +5,12 @@ using Microsoft.IdentityModel.Tokens;
 var builder = WebApplication.CreateBuilder(args);
 
 var platformOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-    ?? new[] { "http://localhost:3001" };
+    ?? new[] { "http://localhost:3001", "http://localhost:3002" };
 builder.Services.AddCors(options => options.AddPolicy("platform", policy => policy
     .WithOrigins(platformOrigins)
-    .WithMethods("GET", "POST")
+    // PUT/DELETE are here for apps/admin (theme, copy, and category updates) —
+    // apps/platform itself only ever sends GET/POST.
+    .WithMethods("GET", "POST", "PUT", "DELETE")
     .WithHeaders("Content-Type", "Authorization", "Idempotency-Key")));
 
 var jwtSigningKey = builder.Configuration["JWT_SIGNING_KEY"] ?? "dev-only-signing-key-change-me-please-32bytes!";
@@ -28,13 +30,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 // A route only ends up gated by this when its appsettings.json entry sets
-// "AuthorizationPolicy": "authenticated" — routes without it stay exactly as
-// open as the backend service they proxy to (e.g. Market Catalog has no auth
-// yet, so its route doesn't gate here either — the gateway never gets
-// stricter than the service behind it on its own).
+// "AuthorizationPolicy": "authenticated" or "admin" — routes without one
+// stay exactly as open as the backend service they proxy to; the gateway
+// never gets stricter than the service behind it on its own.
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("authenticated", policy => policy.RequireAuthenticatedUser());
+    options.AddPolicy("admin", policy => policy.RequireRole("Admin"));
 });
 
 builder.Services.AddReverseProxy()

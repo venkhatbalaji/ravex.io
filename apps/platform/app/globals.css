@@ -16,8 +16,8 @@
   --color-accent-2-text: var(--accent-2-text);
   --color-warning-text: var(--warning-text);
   --color-danger: var(--danger);
-  --font-display: var(--font-fredoka), "Segoe UI", sans-serif;
-  --font-body: var(--font-fredoka), "Segoe UI", sans-serif;
+  --font-display: var(--font-display-active);
+  --font-body: var(--font-body-active);
   --font-mono: var(--font-mono-loaded), ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 
@@ -40,6 +40,15 @@
   --accent-2-text: #38bdf8;
   --warning-text: #fbbf24;
   --danger: #ff6b6b;
+
+  /* Admin-selectable font — BrandingProvider overrides these two at runtime
+     via setProperty; the default here is what renders before that fetch
+     resolves (and if branding was never configured at all). --accent-text
+     and --accent-2-text deliberately do NOT become admin-editable here: a
+     bright arbitrary color used as running text can't guarantee contrast
+     the way a fill behind fixed accent-fg text can. */
+  --font-display-active: var(--font-fredoka), "Segoe UI", sans-serif;
+  --font-body-active: var(--font-fredoka), "Segoe UI", sans-serif;
 }
 
 :root[data-theme="light"] {

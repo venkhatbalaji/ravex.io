@@ -8,10 +8,16 @@ import { api } from "@/lib/api";
 import { useCountUp } from "./use-count-up";
 import { ThemeToggle } from "./theme-toggle";
 import { Logo } from "./logo";
+import { useCopy } from "@/context/branding-context";
 
 export function NavBar() {
   const { isAuthenticated, user, token, logout } = useAuth();
   const router = useRouter();
+  const linkMarkets = useCopy("nav.linkMarkets", "Markets");
+  const linkWallet = useCopy("nav.linkWallet", "Wallet");
+  const logInLabel = useCopy("nav.logIn", "Log in");
+  const registerLabel = useCopy("nav.register", "Register");
+  const logOutLabel = useCopy("nav.logOut", "Log out");
   const { data } = useQuery({
     queryKey: ["balance", token],
     queryFn: () => api.balance(token!),
@@ -26,11 +32,11 @@ export function NavBar() {
         <Logo />
         <nav className="hidden items-center gap-6 text-sm text-muted sm:flex">
           <Link href="/" className="transition hover:text-fg">
-            Markets
+            {linkMarkets}
           </Link>
           {isAuthenticated && (
             <Link href="/wallet" className="transition hover:text-fg">
-              Wallet
+              {linkWallet}
             </Link>
           )}
         </nav>
@@ -48,19 +54,19 @@ export function NavBar() {
                 }}
                 className="rounded-full border border-border-strong px-3 py-1.5 text-xs text-muted transition hover:border-accent/40 hover:text-fg"
               >
-                Log out
+                {logOutLabel}
               </button>
             </>
           ) : (
             <>
               <Link href="/login" className="text-xs text-muted transition hover:text-fg">
-                Log in
+                {logInLabel}
               </Link>
               <Link
                 href="/register"
                 className="glow-accent rounded-full bg-accent px-4 py-1.5 text-xs font-semibold text-accent-fg transition hover:opacity-90"
               >
-                Register
+                {registerLabel}
               </Link>
             </>
           )}

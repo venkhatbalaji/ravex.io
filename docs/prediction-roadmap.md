@@ -9,16 +9,22 @@ market lifecycle.
 
 | Area | Implemented | Missing |
 | --- | --- | --- |
-| Identity | Email/password registration, login, JWT | Admin roles, session renewal, abuse controls |
+| Identity | Email/password registration, login, JWT, roles (`Player`/`Admin`), controlled admin bootstrap | Session renewal, abuse controls, an admin-invite flow beyond the bootstrap |
 | Wallet | Earned coins, atomic ledger debits, durable debit decisions, serialized reward claims | Winner credits, refunds, verified ad/referral rewards |
-| Catalog | Create, list, lock, settle markets | Protected administration, fixtures, cancellation, result audit trail |
-| Settlement | Durable player stakes, admission gates, debit recovery, pool totals, payout ratio | Wallet payouts, refunds, result orchestration |
-| Platform | Login, registration, markets, stake form, wallet | Prediction history, usable admin workflow, rankings |
+| Catalog | Create, list, lock, settle markets; categories; admin-only writes at gateway and service | Fixtures, cancellation, result audit trail |
+| Settlement | Durable player stakes, admission gates, debit recovery, pool totals, payout ratio | Wallet payouts, refunds, result orchestration, admin role check on the settlement computation path |
+| Branding | Theme (brand name, logo URLs, two accent colors, one of four fonts) and a copy-override dictionary, both admin-only to write, public to read; `apps/platform` applies both at runtime | Logo upload/object storage (URLs only), true multi-tenant multi-brand hosting |
+| Platform | Login, registration, markets, stake form, wallet, dynamic branding/copy | Prediction history, rankings |
+| Admin | `apps/admin` — markets (create/lock/settle), categories, branding, admin-only login | Fixtures, cancellation workflow, audit trail viewer |
 | Infrastructure | Compose backend, PostgreSQL, Redis, NATS, gateway | Automated integration checks, readiness checks, operational monitoring |
 
-The platform frontend currently runs separately with `npm run dev:platform`;
-it is not a service in Compose. Redis and NATS are running but are not wired
-into the prediction lifecycle.
+The platform and admin frontends currently run separately with
+`npm run dev:platform` / `npm run dev:admin`; neither is a service in
+Compose. Redis and NATS are running but are not wired into the prediction
+lifecycle.
+
+See [docs/admin-and-white-label.md](admin-and-white-label.md) for what an
+operator can configure today and how to get an admin account.
 
 ## 1. Complete a reliable prediction lifecycle
 

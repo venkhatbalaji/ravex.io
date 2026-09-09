@@ -41,7 +41,22 @@ export interface Market {
   eventStartAt: string;
   status: "open" | "locked" | "settled";
   winningOutcomeId: string | null;
+  categoryId: string | null;
   outcomes: Outcome[];
+}
+
+export interface Theme {
+  brandName: string;
+  logoLightUrl: string;
+  logoDarkUrl: string;
+  accentColor: string;
+  accent2Color: string;
+  font: "Fredoka" | "Nunito" | "Poppins" | "SpaceGrotesk";
+}
+
+export interface CopyOverride {
+  key: string;
+  value: string;
 }
 
 export interface PoolSnapshot {
@@ -61,14 +76,6 @@ export interface StakeSubmission extends PoolSnapshot {
     createdAt: string;
     updatedAt: string;
   };
-}
-
-export interface SettlementResult {
-  marketId: string;
-  winningOutcomeId: string;
-  totalPool: number;
-  winningPool: number;
-  payoutRatio: number;
 }
 
 export interface LedgerEntry {
@@ -101,17 +108,6 @@ export const api = {
 
   markets: (status?: string) => request<Market[]>(`/markets${status ? `?status=${status}` : ""}`),
   market: (id: string) => request<Market>(`/markets/${id}`),
-  createMarket: (title: string, eventStartAt: string, outcomes: string[]) =>
-    request<Market>("/markets", {
-      method: "POST",
-      body: JSON.stringify({ title, eventStartAt, outcomes }),
-    }),
-  lockMarket: (id: string) => request<{ id: string; status: string }>(`/markets/${id}/lock`, { method: "POST" }),
-  settleMarket: (id: string, winningOutcomeId: string) =>
-    request<Market>(`/markets/${id}/settle`, {
-      method: "POST",
-      body: JSON.stringify({ winningOutcomeId }),
-    }),
 
   pool: (marketId: string) => request<PoolSnapshot>(`/pools/${marketId}`),
   stake: (token: string, marketId: string, outcomeId: string, amount: number, idempotencyKey: string) =>
@@ -120,9 +116,7 @@ export const api = {
       { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: JSON.stringify({ outcomeId, amount }) },
       token,
     ),
-  settlePool: (token: string, marketId: string, winningOutcomeId: string) =>
-    request<SettlementResult>(`/pools/${marketId}/settle`, {
-      method: "POST",
-      body: JSON.stringify({ winningOutcomeId }),
-    }, token),
+
+  theme: () => request<Theme>("/branding/theme"),
+  copyOverrides: () => request<CopyOverride[]>("/branding/copy"),
 };

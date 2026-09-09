@@ -22,6 +22,7 @@ public static class DependencyInjection
             npgsql => npgsql.MigrationsHistoryTable("__ef_migrations_history", "market_catalog")));
 
         services.AddScoped<IMarketRepository, MarketRepository>();
+        services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddSingleton<IStakeAdmission, HttpStakeAdmission>();
 
         services.AddScoped<IListMarketsUseCase, ListMarketsUseCase>();
@@ -29,6 +30,11 @@ public static class DependencyInjection
         services.AddScoped<ICreateMarketUseCase, CreateMarketUseCase>();
         services.AddScoped<ILockMarketUseCase, LockMarketUseCase>();
         services.AddScoped<ISettleMarketUseCase, SettleMarketUseCase>();
+
+        services.AddScoped<IListCategoriesUseCase, ListCategoriesUseCase>();
+        services.AddScoped<ICreateCategoryUseCase, CreateCategoryUseCase>();
+        services.AddScoped<IUpdateCategoryUseCase, UpdateCategoryUseCase>();
+        services.AddScoped<IDeleteCategoryUseCase, DeleteCategoryUseCase>();
 
         return services;
     }

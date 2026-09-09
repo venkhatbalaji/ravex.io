@@ -14,5 +14,6 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.Email).IsRequired();
         builder.Property(u => u.PasswordHash).IsRequired();
         builder.Property(u => u.DisplayName).IsRequired();
+        builder.Property(u => u.Role).HasConversion<string>().IsRequired();
     }
 }

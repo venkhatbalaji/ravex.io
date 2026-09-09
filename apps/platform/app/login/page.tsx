@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/auth-context";
+import { useCopy } from "@/context/branding-context";
 import { ApiError } from "@/lib/api";
 
 const fieldClass =
@@ -12,6 +13,8 @@ const fieldClass =
 export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
+  const heading = useCopy("auth.loginHeading", "Log in");
+  const noAccount = useCopy("auth.noAccount", "No account?");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +36,7 @@ export default function LoginPage() {
 
   return (
     <div data-reveal className="mx-auto max-w-sm space-y-6 py-10">
-      <h1 className="font-display text-3xl font-semibold text-fg">Log in</h1>
+      <h1 className="font-display text-3xl font-semibold text-fg">{heading}</h1>
       <form onSubmit={handleSubmit} className="space-y-5">
         <label className="block space-y-1.5 text-xs uppercase tracking-wider text-muted">
           Email
@@ -59,7 +62,7 @@ export default function LoginPage() {
         </button>
       </form>
       <p className="text-xs text-muted">
-        No account?{" "}
+        {noAccount}{" "}
         <Link href="/register" className="text-accent-text">
           Register
         </Link>

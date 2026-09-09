@@ -1,15 +1,18 @@
 import type { Metadata } from "next";
-import { Fredoka, JetBrains_Mono } from "next/font/google";
+import { Fredoka, JetBrains_Mono, Nunito, Poppins, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { NavBar } from "@/components/nav-bar";
 import { RevealController } from "@/components/reveal-controller";
 
-const fredoka = Fredoka({
-  subsets: ["latin"],
-  variable: "--font-fredoka",
-  display: "swap",
-});
+// The short, fixed list of fonts an admin can pick from (services/branding's
+// SupportedFont enum) — all four load here so switching is just a CSS
+// variable change at runtime, no rebuild. The tradeoff: the bundle always
+// ships all four font files rather than just the active one.
+const fredoka = Fredoka({ subsets: ["latin"], variable: "--font-fredoka", display: "swap" });
+const nunito = Nunito({ subsets: ["latin"], variable: "--font-nunito", display: "swap" });
+const poppins = Poppins({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-poppins", display: "swap" });
+const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space-grotesk", display: "swap" });
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -39,7 +42,11 @@ const THEME_INIT_SCRIPT = `(function(){try{if(localStorage.getItem('ravex.platfo
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${fredoka.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${fredoka.variable} ${nunito.variable} ${poppins.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>

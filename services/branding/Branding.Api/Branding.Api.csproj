@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Branding.Application\Branding.Application.csproj" />
+    <ProjectReference Include="..\Branding.Infrastructure\Branding.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

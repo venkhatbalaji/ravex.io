@@ -22,21 +22,30 @@ services never query another service's tables.
 
 | Service | Local port | Owns |
 | --- | --- | --- |
-| gateway (.NET/YARP) | 5100 | Public entry point and route authentication |
-| identity (.NET) | 5101 | Registration, login, JWTs |
+| gateway (.NET/YARP) | 5100 | Public entry point, route authentication and authorization |
+| identity (.NET) | 5101 | Registration, login, JWTs, roles |
 | wallet-ledger (.NET) | 5102 | Coin balances, ledger, durable debit decisions |
-| market-catalog (.NET) | 5103 | Market definitions, lock/result lifecycle |
+| market-catalog (.NET) | 5103 | Market definitions, categories, lock/result lifecycle |
+| branding (.NET) | 5104 | White-label theme and text-copy overrides |
 | settlement-engine (Go) | 5201 | Durable player stakes, admission gates, recovery, pool totals |
 
 Clients call gateway `:5100`. Other ports are exposed for local debugging.
 Gateway routes `/auth/*` and `/me` to Identity, `/wallet/*` to Wallet,
-`/markets/*` to Catalog, and `/pools/*` to Settlement. `/internal/*` endpoints
-are not routed by Gateway and require `X-Service-Key` at the owning service.
+`/markets/*` and `/categories/*` to Catalog, `/pools/*` to Settlement, and
+`/branding/*` to Branding. `/internal/*` endpoints are not routed by Gateway
+and require `X-Service-Key` at the owning service.
+
+Every write route on Catalog and Branding — creating/locking/settling a
+market, creating/renaming/deleting a category, updating theme or copy — is
+gated behind the gateway's `admin` policy (`RequireRole("Admin")`) and
+re-checked at the owning service itself, the same defense-in-depth pattern
+already used for `authenticated` routes. Read routes on both stay public. See
+[Roles, categories, and white-label branding](#roles-categories-and-white-label-branding).
 
 The .NET services expose `/swagger`; Settlement exposes `/swagger` and
 `/openapi.json`. Each service has `/health`. PostgreSQL schemas are `identity`,
-`wallet`, `market_catalog`, and `settlement` in the local `ravex` database.
-Redis and NATS are available in Compose but currently unused.
+`wallet`, `market_catalog`, `settlement`, and `branding` in the local `ravex`
+database. Redis and NATS are available in Compose but currently unused.
 
 ## Stake admission and recovery
 
@@ -75,22 +84,55 @@ are blocked by the gate. Retry locking after recovery finishes. Catalog only
 persists `locked` after the gate has drained. Settlement ratio computation
 also requires a closed gate and no pending stakes.
 
+## Roles, categories, and white-label branding
+
+Full detail, including the complete copy-key list and how to extend the
+system, lives in [docs/admin-and-white-label.md](../docs/admin-and-white-label.md).
+Summary:
+
+- **Roles.** `Identity.Domain.Entities.User` has a `Role` (`Player` or
+  `Admin`), included as a `ClaimTypes.Role` claim on every issued JWT.
+  Public `/auth/register` always creates a `Player` — an `Admin` account can
+  only come from Identity's startup bootstrap
+  (`ADMIN_BOOTSTRAP_EMAIL`/`ADMIN_BOOTSTRAP_PASSWORD`, idempotent, safe to
+  leave set across restarts). This is the roadmap's "controlled setup
+  operation," not a general-purpose invite flow.
+- **Categories.** A `Category` entity in Market Catalog (`Id`, `Name`);
+  `Market.CategoryId` is optional and validated against the repository at
+  create time. Deleting a category un-categorizes its markets (`SetNull`)
+  rather than blocking the delete or cascading.
+- **Branding.** The new `branding` service owns exactly two things: a
+  singleton `Theme` (brand name, two logo URLs, two accent colors, a font
+  from a short fixed list) and a `CopyOverride` key→string dictionary. Both
+  are public to read and admin-only to write. `apps/platform` fetches both
+  once on load and applies them at runtime — CSS custom properties for
+  theme, a lookup dictionary for copy — falling back to its built-in
+  defaults if branding was never configured or the fetch fails. This is
+  intentionally **not** full multi-tenant white-labeling: it configures the
+  one active brand for this deployment, not many brands at once. `apps/admin`
+  (`npm run dev:admin`, port 3002) is the operator UI for all three of these.
+
 ## Run locally
 
 ```bash
 docker compose up -d --build
-npm run dev:platform
+npm run dev:platform   # player app, :3001
+npm run dev:admin      # admin app, :3002 — requires an Admin account, see below
 ```
 
 Compose provides local-only credentials. Set `INTERNAL_SERVICE_KEY` to a
 shared secret of at least 32 characters for Wallet, Catalog, and Settlement
 outside the local defaults. Settlement also accepts `SETTLEMENT_DB_CONNECTION`,
 `WALLET_SERVICE_URL`, `MARKET_CATALOG_SERVICE_URL`, and `IDENTITY_SERVICE_URL`.
-Catalog uses `SETTLEMENT_SERVICE_URL` to close admission. Configuration is in
-root `docker-compose.yml`. Gateway permits browser requests from
-`http://localhost:3001`, including the idempotency header. Configure
-`Cors:AllowedOrigins` (for example `Cors__AllowedOrigins__0`) for another
-platform origin.
+Catalog uses `SETTLEMENT_SERVICE_URL` to close admission. Identity's
+`ADMIN_BOOTSTRAP_EMAIL`/`ADMIN_BOOTSTRAP_PASSWORD` (defaults:
+`admin@predictplay.local` / a dev-only password — see `docker-compose.yml`,
+change both outside local dev) seed the one Admin account this deployment
+starts with. Configuration is in root `docker-compose.yml`. Gateway permits
+browser requests from `http://localhost:3001`, including the idempotency
+header. Configure `Cors:AllowedOrigins` (for example `Cors__AllowedOrigins__0`)
+for another platform origin, including `apps/admin`'s if it's deployed
+somewhere other than `:3002`.
 
 ### Upgrading from the in-memory Settlement version
 

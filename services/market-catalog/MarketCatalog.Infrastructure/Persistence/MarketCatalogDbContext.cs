@@ -9,6 +9,7 @@ public sealed class MarketCatalogDbContext : DbContext
 
     public DbSet<Market> Markets => Set<Market>();
     public DbSet<Outcome> Outcomes => Set<Outcome>();
+    public DbSet<Category> Categories => Set<Category>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

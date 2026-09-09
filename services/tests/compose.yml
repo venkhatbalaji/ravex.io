@@ -18,6 +18,8 @@ services:
       dockerfile: services/identity/Dockerfile
     environment:
       IDENTITY_DB_CONNECTION: "Host=postgres;Database=ravex;Username=ravex;Password=ravex_test;Search Path=identity"
+      ADMIN_BOOTSTRAP_EMAIL: "admin@integration.test"
+      ADMIN_BOOTSTRAP_PASSWORD: "integration-only-admin-password-123"
     depends_on:
       postgres:
         condition: service_healthy

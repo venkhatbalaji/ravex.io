@@ -1,14 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import Link from "next/link";
 import { api, type Market } from "@/lib/api";
 import { OddsBar } from "@/components/odds-bar";
 import { StatusBadge } from "@/components/status-badge";
-import { CreateMarketForm } from "@/components/create-market-form";
 import { HeroReveal } from "@/components/hero-reveal";
+import { useCopy } from "@/context/branding-context";
 
 export default function MarketsPage() {
   const { data: markets, isLoading } = useQuery({
@@ -16,8 +15,16 @@ export default function MarketsPage() {
     queryFn: () => api.markets(),
     refetchInterval: 8000,
   });
-  const [showForm, setShowForm] = useState(false);
-  const queryClient = useQueryClient();
+
+  const eyebrow = useCopy("hero.eyebrow", "Live Markets");
+  const heading1 = useCopy("hero.heading1", "Predict the match.");
+  const heading2 = useCopy("hero.heading2", "Win the powerplay.");
+  const subheading = useCopy(
+    "hero.subheading",
+    "Free coins, real pari-mutuel odds. Stake on an outcome before the market locks — the pool sets the price, not the house.",
+  );
+  const marketsHeading = useCopy("markets.heading", "All markets");
+  const emptyState = useCopy("markets.emptyState", "No markets yet — check back soon.");
 
   return (
     <div className="space-y-10">
@@ -28,19 +35,18 @@ export default function MarketsPage() {
               data-hero-item
               className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted"
             >
-              <span className="live-dot h-1.5 w-1.5 rounded-full bg-accent" /> Live Markets
+              <span className="live-dot h-1.5 w-1.5 rounded-full bg-accent" /> {eyebrow}
             </p>
             <h1
               data-hero-item
               className="font-display text-4xl leading-[0.95] font-semibold tracking-tight text-fg sm:text-5xl"
             >
-              Predict the match.
+              {heading1}
               <br />
-              <span className="text-accent-2-text">Win the powerplay.</span>
+              <span className="text-accent-2-text">{heading2}</span>
             </h1>
             <p data-hero-item className="max-w-lg text-sm leading-relaxed text-muted">
-              Free coins, real pari-mutuel odds. Stake on an outcome before the market locks — the pool sets the
-              price, not the house.
+              {subheading}
             </p>
           </div>
           <Image
@@ -55,24 +61,9 @@ export default function MarketsPage() {
         </section>
       </HeroReveal>
 
-      <div className="flex items-center justify-between" data-reveal>
-        <h2 className="font-display text-xl font-medium text-fg">All markets</h2>
-        <button
-          onClick={() => setShowForm((s) => !s)}
-          className="rounded-full border border-border-strong px-4 py-1.5 text-xs text-muted transition hover:border-accent/40 hover:text-fg"
-        >
-          {showForm ? "Cancel" : "+ New market"}
-        </button>
-      </div>
-
-      {showForm && (
-        <CreateMarketForm
-          onCreated={() => {
-            setShowForm(false);
-            queryClient.invalidateQueries({ queryKey: ["markets"] });
-          }}
-        />
-      )}
+      <h2 className="font-display text-xl font-medium text-fg" data-reveal>
+        {marketsHeading}
+      </h2>
 
       {isLoading && <p className="text-sm text-muted">Loading markets…</p>}
 
@@ -84,7 +75,7 @@ export default function MarketsPage() {
 
       {markets?.length === 0 && !isLoading && (
         <p data-reveal className="text-sm text-muted">
-          No markets yet — create one above.
+          {emptyState}
         </p>
       )}
     </div>
