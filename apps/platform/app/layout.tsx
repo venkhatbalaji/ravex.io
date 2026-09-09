@@ -39,7 +39,7 @@ const THEME_INIT_SCRIPT = `(function(){try{if(localStorage.getItem('ravex.platfo
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${fredoka.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en" className={`${fredoka.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
