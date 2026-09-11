@@ -1,10 +1,13 @@
 const STYLES = {
   open: "bg-accent/10 text-accent-text",
   locked: "bg-warning-text/10 text-warning-text",
+  cancelled: "bg-surface-2 text-muted",
+  settling: "bg-warning-text/10 text-warning-text",
+  refunding: "bg-warning-text/10 text-warning-text",
   settled: "bg-surface-2 text-muted",
 } as const;
 
-const LABELS = { open: "Live", locked: "Locked", settled: "Settled" } as const;
+const LABELS = { open: "Live", locked: "Locked", settled: "Settled", cancelled: "Cancelled", settling: "Paying winners", refunding: "Refunding" } as const;
 
 export function StatusBadge({ status }: { status: keyof typeof STYLES }) {
   return (

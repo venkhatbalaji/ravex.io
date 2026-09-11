@@ -13,6 +13,10 @@ public class Market
     public MarketStatus Status { get; private set; }
     public Guid? WinningOutcomeId { get; private set; }
     public Guid? CategoryId { get; private set; }
+    public string ResultSource { get; private set; } = "";
+    public Guid? ResolvedBy { get; private set; }
+    public DateTimeOffset? ResolutionRequestedAt { get; private set; }
+    public DateTimeOffset? ResolvedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public IReadOnlyList<Outcome> Outcomes => _outcomes;
 
@@ -59,14 +63,34 @@ public class Market
         Status = MarketStatus.Locked;
     }
 
-    public void Settle(Guid winningOutcomeId)
+    public void BeginResolution(Guid? winner, bool cancel, string source, Guid actor)
     {
-        if (Status != MarketStatus.Locked)
-            throw new InvalidMarketStateException("A market must be locked before it can be settled.");
-        if (!_outcomes.Any(o => o.Id == winningOutcomeId))
-            throw new UnknownOutcomeException(winningOutcomeId);
+        if (string.IsNullOrWhiteSpace(source) || source.Trim().Length > 500 || actor == Guid.Empty)
+            throw new InvalidMarketDefinitionException("Provide result evidence or a cancellation reason (up to 500 characters).");
+        if (Status is MarketStatus.Settling or MarketStatus.Refunding or MarketStatus.Settled or MarketStatus.Cancelled)
+        {
+            var wasCancel = Status is MarketStatus.Refunding or MarketStatus.Cancelled;
+            if (wasCancel == cancel && WinningOutcomeId == winner && ResultSource == source.Trim()) return;
+            throw new InvalidMarketStateException("A different result or cancellation has already been recorded.");
+        }
+        if (!cancel && Status != MarketStatus.Locked)
+            throw new InvalidMarketStateException("Lock the market before recording a result.");
+        if (!cancel && !_outcomes.Any(o => o.Id == winner)) throw new UnknownOutcomeException(winner ?? Guid.Empty);
+        WinningOutcomeId = winner;
+        ResultSource = source.Trim();
+        ResolvedBy = actor;
+        ResolutionRequestedAt = DateTimeOffset.UtcNow;
+        Status = cancel ? MarketStatus.Refunding : MarketStatus.Settling;
+    }
 
-        Status = MarketStatus.Settled;
-        WinningOutcomeId = winningOutcomeId;
+    public void CompleteResolution()
+    {
+        Status = Status switch
+        {
+            MarketStatus.Settling => MarketStatus.Settled,
+            MarketStatus.Refunding => MarketStatus.Cancelled,
+            _ => throw new InvalidMarketStateException("No resolution is processing.")
+        };
+        ResolvedAt = DateTimeOffset.UtcNow;
     }
 }

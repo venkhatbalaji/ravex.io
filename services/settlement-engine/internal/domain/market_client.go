@@ -19,10 +19,11 @@ type MarketClient interface {
 }
 
 type Market struct {
-	ID           string
-	Status       string
-	EventStartAt time.Time
-	OutcomeIDs   []string
+	WinningOutcomeID string
+	ID               string
+	Status           string
+	EventStartAt     time.Time
+	OutcomeIDs       []string
 }
 
 func (m Market) ValidateStake(outcomeID string, now time.Time) error {

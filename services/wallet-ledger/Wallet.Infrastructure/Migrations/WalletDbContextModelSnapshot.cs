@@ -76,6 +76,27 @@ namespace Wallet.Infrastructure.Migrations
                     b.ToTable("ledger_entries", "wallet");
                 });
 
+            modelBuilder.Entity("Wallet.Domain.Entities.SettlementReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<long>("Total")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("settlement_receipts", "wallet");
+                });
+
             modelBuilder.Entity("Wallet.Domain.Entities.StakeDebit", b =>
                 {
                     b.Property<Guid>("Id")

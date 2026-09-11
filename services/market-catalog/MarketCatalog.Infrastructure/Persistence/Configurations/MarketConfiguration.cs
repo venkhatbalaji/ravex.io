@@ -9,8 +9,9 @@ public sealed class MarketConfiguration : IEntityTypeConfiguration<Market>
     public void Configure(EntityTypeBuilder<Market> builder)
     {
         builder.ToTable("markets");
+        builder.Property(m => m.ResultSource).HasMaxLength(500);
         builder.HasKey(m => m.Id);
-        builder.Property(m => m.Status).HasConversion<string>().IsRequired();
+        builder.Property(m => m.Status).HasConversion<string>().IsRequired().IsConcurrencyToken();
 
         builder.HasMany(m => m.Outcomes)
             .WithOne()

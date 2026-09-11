@@ -39,9 +39,13 @@ export interface Market {
   title: string;
   description: string;
   eventStartAt: string;
-  status: "open" | "locked" | "settled";
+  status: "open" | "locked" | "settling" | "refunding" | "settled" | "cancelled";
   winningOutcomeId: string | null;
   categoryId: string | null;
+  resultSource: string;
+  resolvedBy: string | null;
+  resolutionRequestedAt: string | null;
+  resolvedAt: string | null;
   outcomes: Outcome[];
 }
 
@@ -84,7 +88,20 @@ export interface LedgerEntry {
   createdAt: string;
 }
 
+export interface Prediction {
+  id: string;
+  marketId: string;
+  outcomeId: string;
+  amount: number;
+  state: "pending" | "accepted" | "rejected";
+  result: "pending" | "active" | "processing" | "won" | "lost" | "refunded" | "rejected";
+  payout: number;
+  createdAt: string;
+}
+
 export const api = {
+  predictions: (token: string, offset = 0) =>
+    request<{ items: Prediction[]; nextOffset: number | null }>(`/predictions/me?limit=20&offset=${offset}`, {}, token),
   register: (email: string, password: string, displayName: string) =>
     request<{ id: string; email: string; displayName: string }>("/auth/register", {
       method: "POST",

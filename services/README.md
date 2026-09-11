@@ -1,8 +1,8 @@
 # Backend services
 
 Free-to-play, coin-staked prediction markets with manually entered results.
-Wallet issues earned virtual coins; purchases, payouts, and a match feed are
-not implemented. See the [product roadmap](../docs/prediction-roadmap.md).
+Wallet issues earned virtual coins and settles winnings/refunds. Purchases
+and a match feed are not implemented. See the [product roadmap](../docs/prediction-roadmap.md).
 
 ## Architecture
 
@@ -24,14 +24,14 @@ services never query another service's tables.
 | --- | --- | --- |
 | gateway (.NET/YARP) | 5100 | Public entry point, route authentication and authorization |
 | identity (.NET) | 5101 | Registration, login, JWTs, roles |
-| wallet-ledger (.NET) | 5102 | Coin balances, ledger, durable debit decisions |
+| wallet-ledger (.NET) | 5102 | Coin balances, ledger, durable debit decisions and payout receipts |
 | market-catalog (.NET) | 5103 | Market definitions, categories, lock/result lifecycle |
 | branding (.NET) | 5104 | White-label theme and text-copy overrides |
-| settlement-engine (Go) | 5201 | Durable player stakes, admission gates, recovery, pool totals |
+| settlement-engine (Go) | 5201 | Durable player stakes, admission gates, payout plans and recovery |
 
 Clients call gateway `:5100`. Other ports are exposed for local debugging.
 Gateway routes `/auth/*` and `/me` to Identity, `/wallet/*` to Wallet,
-`/markets/*` and `/categories/*` to Catalog, `/pools/*` to Settlement, and
+`/markets/*` and `/categories/*` to Catalog, `/pools/*` and `/predictions/*` to Settlement, and
 `/branding/*` to Branding. `/internal/*` endpoints are not routed by Gateway
 and require `X-Service-Key` at the owning service.
 
@@ -83,6 +83,17 @@ lock endpoint returns 409 and its status remains unchanged, but new stakes
 are blocked by the gate. Retry locking after recovery finishes. Catalog only
 persists `locked` after the gate has drained. Settlement ratio computation
 also requires a closed gate and no pending stakes.
+
+## Results, payouts, and refunds
+
+Admin records a locked market's result with `POST /markets/{id}/settle`
+(`winningOutcomeId`, `source`) or cancels an open/locked market with
+`POST /markets/{id}/cancel` (`reason`). Durable workers pay or refund accepted
+stakes; final status follows Wallet confirmation. Players see their own
+records through `GET /predictions/me` and the platform history page.
+
+See [settlement and testing](../docs/settlement-and-testing.md) for contracts,
+integer rounding, retry guarantees, and legacy-data limitations.
 
 ## Roles, categories, and white-label branding
 
@@ -152,7 +163,8 @@ TOKEN=$(curl -s -X POST localhost:5100/auth/login -H 'Content-Type: application/
   -d '{"email":"fan@ravex.io","password":"password123"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["accessToken"])')
 curl -s -X POST localhost:5100/wallet/me/earn -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' -d '{"reason":"daily_login"}'
-curl -s -X POST localhost:5100/markets -H 'Content-Type: application/json' \
+# Set ADMIN_TOKEN from an administrator login first.
+curl -s -X POST localhost:5100/markets -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
   -d '{"title":"MI vs CSK","eventStartAt":"2027-03-20T14:00:00Z","outcomes":["MI","CSK"]}'
 # Use the returned market and outcome IDs below, and keep this key for retries.
 STAKE_KEY=$(python3 -c 'import uuid;print(uuid.uuid4())')
@@ -160,10 +172,10 @@ curl -s -X POST localhost:5100/pools/<marketId>/stakes \
   -H "Authorization: Bearer $TOKEN" -H "Idempotency-Key: $STAKE_KEY" \
   -H 'Content-Type: application/json' -d '{"outcomeId":"<outcomeId>","amount":10}'
 curl -s localhost:5100/wallet/me/balance -H "Authorization: Bearer $TOKEN"
-curl -s -X POST localhost:5100/markets/<marketId>/lock
-# This computes a ratio; it does not pay winners.
+curl -s -X POST localhost:5100/markets/<marketId>/lock -H "Authorization: Bearer $ADMIN_TOKEN"
+# Admin-only preview: this computes a ratio; it does not pay winners.
 curl -s -X POST localhost:5100/pools/<marketId>/settle \
-  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
   -d '{"winningOutcomeId":"<outcomeId>"}'
 ```
 
@@ -196,14 +208,14 @@ docker run --rm -v "$PWD/services/settlement-engine:/src" -w /src golang:1.22-al
 npm run typecheck --workspace=@ravex/platform
 ```
 
+For typechecks, backend integration, and Chromium journeys together, run
+`npm run test:all` after `npx playwright install chromium`. CI runs this same
+command. See [test coverage](../docs/settlement-and-testing.md#verification).
+
 ## Remaining product gaps
 
-- Catalog writes still lack admin authorization. Pool ratio computation
-  requires a player token but has no admin role requirement. Admin roles and
-  a trusted result workflow are required before exposing payout operations.
-- Pool settlement computes ratios only. Wallet winner credits, cancellation
-  refunds, deterministic rounding, and durable payout plans remain to build.
+- Fixtures, automatic result feeds, rankings, and an admin audit/backlog viewer.
 - Ad/referral earn reasons are accepted from the caller without independent
   event verification. Rate limits and operational monitoring are not built.
-- Historical in-memory pools are not migrated automatically. Prediction
-  history UI and result audit records remain on the roadmap.
+- Historical in-memory pools and already-settled legacy markets are not
+  automatically migrated or paid. Reconcile them before an upgrade.

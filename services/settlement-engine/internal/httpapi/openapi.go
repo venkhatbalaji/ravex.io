@@ -9,7 +9,7 @@ const openAPISpec = `{
   "info": {
     "title": "Ravex Settlement Engine API",
     "version": "v1",
-    "description": "Durable per-player stake admission, pool aggregation, and payout-ratio computation. Wallet payouts are not implemented."
+    "description": "Durable stake admission, idempotent coin payouts and refunds, and private player prediction history. Administrative results are recorded through Market Catalog; internal resolution endpoints require service authentication."
   },
   "paths": {
     "/health": {
@@ -196,6 +196,9 @@ const openAPISpec = `{
           },
           "401": {
             "description": "Missing or invalid player token"
+          },
+          "403": {
+            "description": "Administrator role required"
           }
         },
         "security": [
@@ -203,7 +206,50 @@ const openAPISpec = `{
             "Bearer": []
           }
         ],
-        "description": "Calculation only; does not credit wallets or persist a result. Admission must already be closed and all admitted stakes must be terminal."
+        "description": "Admin-only preview of the payout ratio. Does not record a result or transfer coins. Record the final decision through POST /markets/{marketId}/settle with evidence; cancel through POST /markets/{marketId}/cancel."
+      }
+    },
+    "/predictions/me": {
+      "get": {
+        "summary": "List the authenticated player's predictions and confirmed coin returns",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "items with stake fields, result (pending/active/processing/won/lost/refunded/rejected), payout, and nullable nextOffset. Only confirmed wallet returns are exposed as payout."
+          },
+          "400": {
+            "description": "Invalid pagination"
+          },
+          "401": {
+            "description": "Missing or invalid player token"
+          }
+        }
       }
     }
   },

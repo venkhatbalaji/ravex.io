@@ -27,21 +27,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<AdminUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [storageReady, setStorageReady] = useState(false);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored) setToken(stored);
-    else setIsLoading(false);
+    setToken(stored);
+    setStorageReady(true);
   }, []);
 
   useEffect(() => {
+    if (!storageReady) return;
     if (!token) {
       setUser(null);
+      setIsLoading(false);
       return;
     }
+    let cancelled = false;
     api
       .me(token)
       .then((me) => {
+        if (cancelled) return;
         if (me.role !== "Admin") {
           setToken(null);
           setUser(null);
@@ -50,16 +55,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(me);
       })
       .catch(() => {
+        if (cancelled) return;
         setToken(null);
         setUser(null);
       })
-      .finally(() => setIsLoading(false));
-  }, [token]);
+      .finally(() => { if (!cancelled) setIsLoading(false); });
+    return () => { cancelled = true; };
+  }, [token, storageReady]);
 
   useEffect(() => {
+    // Do not erase the stored session during the initial hydration render.
+    if (!storageReady) return;
     if (token) window.localStorage.setItem(STORAGE_KEY, token);
     else window.localStorage.removeItem(STORAGE_KEY);
-  }, [token]);
+  }, [token, storageReady]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

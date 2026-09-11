@@ -41,7 +41,10 @@ func main() {
 	markets := marketclient.NewHTTPClient(env("MARKET_CATALOG_SERVICE_URL", "http://localhost:5103"))
 	identity := identityclient.NewHTTPClient(env("IDENTITY_SERVICE_URL", "http://localhost:5101"))
 	useCase := service.NewSettlementService(repo, wallet, markets)
-	server := &http.Server{Addr: ":8080", Handler: httpapi.NewServer(useCase, identity, key).Routes(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}
+	resolutions := service.NewResolutionService(repo, wallet, markets)
+	server := &http.Server{Addr: ":8080", Handler: httpapi.NewServer(useCase, identity, key, resolutions).Routes(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}
+	resolutionDone := make(chan struct{})
+	go func() { defer close(resolutionDone); resolutions.Recover(ctx) }()
 	recoveryDone := make(chan struct{})
 	go func() { defer close(recoveryDone); useCase.Recover(ctx) }()
 	go func() {
@@ -58,4 +61,5 @@ func main() {
 		stop()
 	}
 	<-recoveryDone
+	<-resolutionDone
 }

@@ -11,19 +11,23 @@ import (
 	"net/http"
 	"ravex/settlement-engine/internal/domain"
 	"ravex/settlement-engine/internal/service"
+	"strconv"
 )
 
 type Server struct {
-	settlement *service.SettlementService
-	identity   domain.IdentityClient
-	serviceKey string
+	settlement  *service.SettlementService
+	identity    domain.IdentityClient
+	serviceKey  string
+	resolutions *service.ResolutionService
 }
 
-func NewServer(settlement *service.SettlementService, identity domain.IdentityClient, serviceKey string) *Server {
-	return &Server{settlement, identity, serviceKey}
+func NewServer(settlement *service.SettlementService, identity domain.IdentityClient, serviceKey string, resolutions *service.ResolutionService) *Server {
+	return &Server{settlement, identity, serviceKey, resolutions}
 }
 func (s *Server) Routes() *http.ServeMux {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /predictions/me", s.handlePredictions)
+	mux.HandleFunc("POST /internal/pools/{marketId}/resolve", s.handleResolve)
 	mux.HandleFunc("GET /health", s.handleHealth)
 	mux.HandleFunc("POST /pools/{marketId}/stakes", s.handleAddStake)
 	mux.HandleFunc("GET /pools/{marketId}", s.handleGetPool)
@@ -136,7 +140,7 @@ func (s *Server) handleClose(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 func (s *Server) handleSettle(w http.ResponseWriter, r *http.Request) {
-	if _, err := s.identity.CurrentUser(r.Context(), r.Header.Get("Authorization")); err != nil {
+	if _, err := s.identity.CurrentAdmin(r.Context(), r.Header.Get("Authorization")); err != nil {
 		writeError(w, err)
 		return
 	}
@@ -168,6 +172,8 @@ func writeError(w http.ResponseWriter, err error) {
 	status := http.StatusBadGateway
 	message := err.Error()
 	switch {
+	case errors.Is(err, domain.ErrForbidden):
+		status = 403
 	case errors.Is(err, domain.ErrUnauthorized):
 		status = 401
 	case errors.Is(err, domain.ErrInsufficientBalance):
@@ -176,7 +182,7 @@ func writeError(w http.ResponseWriter, err error) {
 		status = 404
 	case errors.Is(err, domain.ErrInvalidAmount), errors.Is(err, domain.ErrUnknownOutcome):
 		status = 400
-	case errors.Is(err, domain.ErrMarketClosed), errors.Is(err, domain.ErrIdempotencyConflict), errors.Is(err, domain.ErrPendingStakes), errors.Is(err, domain.ErrAdmissionOpen), errors.Is(err, domain.ErrNoStakesOnOutcome):
+	case errors.Is(err, domain.ErrResolutionConflict), errors.Is(err, domain.ErrMarketClosed), errors.Is(err, domain.ErrIdempotencyConflict), errors.Is(err, domain.ErrPendingStakes), errors.Is(err, domain.ErrAdmissionOpen), errors.Is(err, domain.ErrNoStakesOnOutcome):
 		status = 409
 	default:
 		log.Printf("settlement request: %v", err)
@@ -191,4 +197,64 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(body)
+}
+
+func (s *Server) handleResolve(w http.ResponseWriter, r *http.Request) {
+	expected := sha256.Sum256([]byte(s.serviceKey))
+	supplied := sha256.Sum256([]byte(r.Header.Get("X-Service-Key")))
+	if s.serviceKey == "" || subtle.ConstantTimeCompare(expected[:], supplied[:]) != 1 {
+		writeError(w, domain.ErrUnauthorized)
+		return
+	}
+	id, err := validID(r.PathValue("marketId"))
+	if err != nil {
+		writeJSON(w, 400, map[string]string{"error": "invalid marketId"})
+		return
+	}
+	plan, err := s.resolutions.Resolve(r.Context(), id)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	status := 200
+	if !plan.Completed {
+		status = 202
+	}
+	writeJSON(w, status, map[string]any{"marketId": id, "completed": plan.Completed, "kind": plan.Kind, "total": plan.Total})
+}
+func (s *Server) handlePredictions(w http.ResponseWriter, r *http.Request) {
+	user, err := s.identity.CurrentUser(r.Context(), r.Header.Get("Authorization"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	limit, offset := 20, 0
+	if value := r.URL.Query().Get("limit"); value != "" {
+		limit, err = strconv.Atoi(value)
+		if err != nil {
+			limit = 0
+		}
+	}
+	if value := r.URL.Query().Get("offset"); value != "" {
+		offset, err = strconv.Atoi(value)
+		if err != nil {
+			offset = -1
+		}
+	}
+	if limit < 1 || limit > 100 || offset < 0 || offset > 1000000 {
+		writeJSON(w, 400, map[string]string{"error": "limit must be 1–100 and offset 0–1000000"})
+		return
+	}
+	items, err := s.resolutions.Predictions(r.Context(), user, limit+1, offset)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	var next *int
+	if len(items) > limit {
+		n := offset + limit
+		next = &n
+		items = items[:limit]
+	}
+	writeJSON(w, 200, map[string]any{"items": items, "nextOffset": next})
 }

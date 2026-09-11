@@ -42,6 +42,7 @@ services:
       MARKET_CATALOG_DB_CONNECTION: "Host=postgres;Database=ravex;Username=ravex;Password=ravex_test;Search Path=market_catalog"
       INTERNAL_SERVICE_KEY: integration-only-service-key-32-characters
       SETTLEMENT_SERVICE_URL: "http://settlement-engine:8080"
+    ports: ["127.0.0.1::8080"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -57,12 +58,27 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+  branding:
+    build:
+      context: ../..
+      dockerfile: services/branding/Dockerfile
+    environment:
+      BRANDING_DB_CONNECTION: "Host=postgres;Database=ravex;Username=ravex;Password=ravex_test;Search Path=branding"
+    ports: ["127.0.0.1::8080"]
+    depends_on:
+      postgres:
+        condition: service_healthy
   gateway:
     build:
       context: ../..
       dockerfile: services/gateway/Dockerfile
+    environment:
+      Cors__AllowedOrigins__0: "http://localhost:3001"
+      Cors__AllowedOrigins__1: "http://localhost:3002"
+      Cors__AllowedOrigins__2: "http://localhost:13001"
+      Cors__AllowedOrigins__3: "http://localhost:13002"
     ports: ["127.0.0.1::8080"]
-    depends_on: [identity, wallet-ledger, market-catalog, settlement-engine]
+    depends_on: [identity, wallet-ledger, market-catalog, settlement-engine, branding]
   go-tests:
     image: golang:1.22-alpine
     profiles: [test]

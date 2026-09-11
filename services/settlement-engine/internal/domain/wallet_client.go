@@ -17,5 +17,6 @@ type WalletClient interface {
 }
 
 type IdentityClient interface {
+	CurrentAdmin(context.Context, string) (string, error)
 	CurrentUser(context.Context, string) (string, error)
 }

@@ -14,6 +14,7 @@ export function NavBar() {
   const { isAuthenticated, user, token, logout } = useAuth();
   const router = useRouter();
   const linkMarkets = useCopy("nav.linkMarkets", "Markets");
+  const linkPredictions = useCopy("nav.linkPredictions", "My predictions");
   const linkWallet = useCopy("nav.linkWallet", "Wallet");
   const logInLabel = useCopy("nav.logIn", "Log in");
   const registerLabel = useCopy("nav.register", "Register");
@@ -34,6 +35,7 @@ export function NavBar() {
           <Link href="/" className="transition hover:text-fg">
             {linkMarkets}
           </Link>
+          {isAuthenticated && <Link href="/predictions" className="transition hover:text-fg">{linkPredictions}</Link>}
           {isAuthenticated && (
             <Link href="/wallet" className="transition hover:text-fg">
               {linkWallet}
@@ -73,6 +75,7 @@ export function NavBar() {
           <ThemeToggle />
         </div>
       </div>
+      {isAuthenticated && <nav className="flex justify-center gap-6 border-t border-border py-2 text-xs text-muted sm:hidden"><Link href="/">{linkMarkets}</Link><Link href="/predictions">{linkPredictions}</Link><Link href="/wallet">{linkWallet}</Link></nav>}
     </header>
   );
 }

@@ -178,6 +178,8 @@ function ThemeForm({ theme, onSaved }: { theme: Theme; onSaved: () => void }) {
 
 /** Every copy key the player app actually reads — see docs/admin-and-white-label.md. */
 const COPY_KEYS: { key: string; label: string; default: string }[] = [
+  { key: "nav.linkPredictions", label: "Predictions navigation", default: "My predictions" },
+  { key: "predictions.heading", label: "Prediction history heading", default: "My predictions" },
   { key: "nav.linkMarkets", label: "Nav — Markets link", default: "Markets" },
   { key: "nav.linkWallet", label: "Nav — Wallet link", default: "Wallet" },
   { key: "nav.logIn", label: "Nav — Log in link", default: "Log in" },

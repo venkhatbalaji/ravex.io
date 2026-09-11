@@ -14,12 +14,12 @@ public interface IPlaceStakeUseCase
 
 public sealed class PlaceStakeUseCase(
     IAccountRepository accounts, ILedgerRepository ledger,
-    IStakeDebitRepository debits, IWalletTransaction transactions) : IPlaceStakeUseCase
+    IStakeDebitRepository debits, IWalletTransaction transactions, ISettlementReceiptRepository receipts) : IPlaceStakeUseCase
 {
     public async Task<StakeResult> ExecuteAsync(Guid stakeId, PlaceStakeRequest request, CancellationToken ct = default)
     {
         if (request.Amount <= 0) throw new InvalidStakeAmountException();
-        await using var transaction = await transactions.BeginAsync(request.UserId, stakeId, ct);
+        await using var transaction = await transactions.BeginAsync(request.UserId, stakeId, ct, request.MarketId);
         var previous = await debits.GetAsync(stakeId, ct);
         if (previous is not null)
         {
@@ -29,6 +29,7 @@ public sealed class PlaceStakeUseCase(
             return Result(previous);
         }
 
+        if (await receipts.GetAsync(request.MarketId, ct) is not null) throw new StakeConflictException();
         var account = await accounts.GetOrCreateForUserAsync(request.UserId, ct);
         var balance = await ledger.GetBalanceAsync(account.Id, ct);
         var accepted = balance >= request.Amount;

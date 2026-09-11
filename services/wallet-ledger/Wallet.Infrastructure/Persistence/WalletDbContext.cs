@@ -11,6 +11,8 @@ public sealed class WalletDbContext : DbContext
     public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
     public DbSet<StakeDebit> StakeDebits => Set<StakeDebit>();
 
+    public DbSet<SettlementReceipt> SettlementReceipts => Set<SettlementReceipt>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("wallet");

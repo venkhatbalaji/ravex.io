@@ -11,6 +11,15 @@ public static class InternalStakeEndpoints
     public static void MapInternalStakeEndpoints(this IEndpointRouteBuilder app, string serviceKey)
     {
         var expected = SHA256.HashData(Encoding.UTF8.GetBytes(serviceKey));
+        app.MapPost("/internal/settlements/{marketId:guid}", async (Guid marketId, PaySettlementRequest request, HttpContext context, PaySettlementUseCase useCase) =>
+        {
+            var supplied = SHA256.HashData(Encoding.UTF8.GetBytes(context.Request.Headers["X-Service-Key"].ToString()));
+            if (!CryptographicOperations.FixedTimeEquals(expected, supplied)) return Results.Unauthorized();
+            try { return Results.Ok(await useCase.ExecuteAsync(marketId, request, context.RequestAborted)); }
+            catch (InvalidPayoutException ex) { return Results.BadRequest(new { error = ex.Message }); }
+            catch (StakeConflictException ex) { return Results.Conflict(new { error = ex.Message }); }
+            catch (OverflowException) { return Results.BadRequest(new { error = "Payout total is too large." }); }
+        });
         app.MapPost("/internal/stakes/{stakeId:guid}", async (
             Guid stakeId, PlaceStakeRequest request, HttpContext context, IPlaceStakeUseCase useCase) =>
         {

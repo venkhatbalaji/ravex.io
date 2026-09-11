@@ -10,6 +10,9 @@ const STATUS_STYLE: Record<Market["status"], string> = {
   open: "bg-accent/10 text-accent",
   locked: "bg-amber-500/10 text-amber-500",
   settled: "bg-surface-2 text-muted",
+  cancelled: "bg-surface-2 text-muted",
+  settling: "bg-amber-500/10 text-amber-500",
+  refunding: "bg-amber-500/10 text-amber-500",
 };
 
 const fieldClass =
@@ -26,7 +29,7 @@ export default function MarketsPage() {
 function MarketsContent() {
   const { token } = useAuth();
   const queryClient = useQueryClient();
-  const { data: markets, isLoading } = useQuery({ queryKey: ["markets"], queryFn: () => api.markets() });
+  const { data: markets, isLoading } = useQuery({ queryKey: ["markets"], queryFn: () => api.markets(), refetchInterval: 3000 });
   const { data: categories } = useQuery({ queryKey: ["categories"], queryFn: () => api.categories() });
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,16 +46,6 @@ function MarketsContent() {
       queryClient.invalidateQueries({ queryKey: ["markets"] });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not lock the market.");
-    }
-  }
-
-  async function settle(market: Market, winningOutcomeId: string) {
-    setError(null);
-    try {
-      await api.settleMarket(token!, market.id, winningOutcomeId);
-      queryClient.invalidateQueries({ queryKey: ["markets"] });
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not settle the market.");
     }
   }
 
@@ -109,18 +102,17 @@ function MarketsContent() {
                       Lock
                     </button>
                   )}
-                  {market.status === "locked" && (
-                    <div className="flex flex-wrap gap-2">
-                      {market.outcomes.map((o) => (
-                        <button
-                          key={o.id}
-                          onClick={() => settle(market, o.id)}
-                          className="rounded border border-border-strong px-2 py-1 text-xs text-muted transition hover:border-accent/40 hover:text-fg"
-                        >
-                          {o.label} wins
-                        </button>
-                      ))}
-                    </div>
+                  {(market.status === "open" || market.status === "locked") && (
+                    <ResolutionForm market={market} />
+                  )}
+                  {(market.status === "settling" || market.status === "refunding") && (
+                    <p role="status" className="text-xs text-muted">Transferring coins. This page updates automatically.</p>
+                  )}
+                  {market.resultSource && (
+                    <p className="mt-2 max-w-sm text-xs text-muted">
+                      {market.resultSource}
+                      {market.resolvedAt && <> · Completed {new Date(market.resolvedAt).toLocaleString()}</>}
+                    </p>
                   )}
                 </td>
               </tr>
@@ -217,6 +209,42 @@ function CreateMarketForm({
       >
         {submitting ? "Creating…" : "Create market"}
       </button>
+    </form>
+  );
+}
+
+function ResolutionForm({ market }: { market: Market }) {
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+  const [action, setAction] = useState("cancel");
+  const [source, setSource] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true); setError(null);
+    try {
+      if (action === "cancel") await api.cancelMarket(token!, market.id, source);
+      else await api.settleMarket(token!, market.id, action, source);
+      await queryClient.invalidateQueries({ queryKey: ["markets"] });
+    } catch (err) { setError(err instanceof Error ? err.message : "Could not record the decision."); }
+    finally { setBusy(false); }
+  }
+  return (
+    <form onSubmit={submit} className="mt-2 min-w-60 space-y-2">
+      <label className="block text-xs text-muted">Resolution
+        <select aria-label={`Resolution for ${market.title}`} value={action} onChange={(e) => setAction(e.target.value)} disabled={busy} className={fieldClass}>
+          <option value="cancel">Cancel and refund every stake</option>
+          {market.status === "locked" && market.outcomes.map(o => <option key={o.id} value={o.id}>{o.label} wins</option>)}
+        </select>
+      </label>
+      <label className="block text-xs text-muted">Result evidence or cancellation reason
+        <input aria-label={`Evidence for ${market.title}`} value={source} onChange={(e) => setSource(e.target.value)} maxLength={500} required disabled={busy} className={fieldClass} />
+      </label>
+      <p className="text-xs text-muted">The recorded decision is final. Unbacked winning outcomes refund all stakes.</p>
+      {error && <p role="alert" className="text-xs text-danger">{error}</p>}
+      <button disabled={busy} className="rounded-md bg-accent px-3 py-1.5 text-xs text-accent-fg disabled:opacity-50">{busy ? "Recording…" : action === "cancel" ? "Cancel and refund" : "Record result and pay"}</button>
     </form>
   );
 }

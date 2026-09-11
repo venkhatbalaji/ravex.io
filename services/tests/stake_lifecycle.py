@@ -2,11 +2,13 @@
 """Run with Python 3; creates and removes its own isolated Compose project.
 Use --project NAME to exercise an already-running test project without cleanup.
 """
+from product_features import verify_product_features
 import argparse
 import concurrent.futures
 import datetime
 import json
 import pathlib
+import os
 import subprocess
 import time
 import urllib.error
@@ -22,25 +24,35 @@ ADMIN_PASSWORD = "integration-only-admin-password-123"
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project")
+    parser.add_argument("--ui", action="store_true", help="Also run the real admin/platform browser journey")
     args = parser.parse_args()
     project = args.project or "ravex-stakes-test-" + uuid.uuid4().hex[:8]
     compose = ["docker", "compose", "-p", project, "-f", str(ROOT / "services/tests/compose.yml")]
 
+    endpoint_cache, known_endpoints = {}, {}
+
     def command(*parts, capture=False):
         result = subprocess.run(compose + list(parts), check=True, text=True, capture_output=capture)
+        if parts[0] in ("start", "restart", "up"):
+            endpoint_cache.clear()
         return result.stdout.strip() if capture else None
 
     def endpoint(service):
-        return "http://" + command("port", service, "8080", capture=True).splitlines()[0]
+        if service not in endpoint_cache:
+            endpoint_cache[service] = "http://" + command("port", service, "8080", capture=True).splitlines()[0]
+            known_endpoints[endpoint_cache[service]] = service
+        return endpoint_cache[service]
 
     def sql(statement):
         return command("exec", "-T", "postgres", "psql", "-U", "ravex", "-d", "ravex", "-At", "-v", "ON_ERROR_STOP=1", "-c", statement, capture=True)
 
-    def call(base, path, body=None, token=None, headers=None):
+    def call(base, path, body=None, token=None, headers=None, method=None):
+        if base in known_endpoints:
+            base = endpoint(known_endpoints[base])
         actual = {"Content-Type": "application/json", **(headers or {})}
         if token:
             actual["Authorization"] = "Bearer " + token
-        req = urllib.request.Request(base + path, data=json.dumps(body).encode() if body is not None else None, headers=actual)
+        req = urllib.request.Request(base + path, data=json.dumps(body).encode() if body is not None else None, headers=actual, method=method)
         try:
             with urllib.request.urlopen(req, timeout=20) as response:
                 raw = response.read()
@@ -189,17 +201,35 @@ def main():
         eventually(lambda: predict(recovery_token, outage_market, outage_key)[0] == 200 and balance(recovery_token) == 130, "restart lost durable result")
         print("PASS: outage recovery, market drain, and repeated restart", flush=True)
 
+        verify_product_features(call, expect, eventually, command, sql, endpoint, gateway, wallet, settlement, admin_token, player, market, predict, balance, lock, KEY)
+
         assert sql('SELECT COUNT(*) FROM (SELECT "TransactionId" FROM wallet.ledger_entries GROUP BY "TransactionId" HAVING SUM("Amount") <> 0 OR COUNT(*) <> 2) bad') == "0"
         assert sql('SELECT COUNT(*) FROM (SELECT a."Id" FROM wallet.accounts a JOIN wallet.ledger_entries e ON e."AccountId"=a."Id" WHERE a."OwnerType"=\'User\' GROUP BY a."Id" HAVING SUM(e."Amount") < 0) bad') == "0"
         accepted = sql("SELECT COALESCE(SUM(amount),0) FROM settlement.stakes WHERE state='accepted'")
         escrow = sql('SELECT COALESCE(SUM("Amount"),0) FROM wallet.ledger_entries WHERE "AccountId"=\'00000000-0000-0000-0000-000000000002\'')
-        assert accepted == escrow, (accepted, escrow)
+        paid = sql('SELECT COALESCE(SUM("Total"),0) FROM wallet.settlement_receipts')
+        assert int(accepted) - int(paid) == int(escrow), (accepted, paid, escrow)
         print("PASS: double-entry ledger and accepted-stake escrow reconcile", flush=True)
 
         if not args.project:
             command("exec", "-T", "postgres", "createdb", "-U", "ravex", "settlement_tests")
             command("run", "--rm", "go-tests")
-        print("All durable stake integration checks passed.", flush=True)
+        if args.ui:
+            # Next regenerates these when the test server uses .next-e2e.
+            generated = [ROOT / "apps" / app / name
+                         for app in ("admin", "platform")
+                         for name in ("next-env.d.ts", "tsconfig.json")]
+            originals = {path: path.read_bytes() if path.exists() else None for path in generated}
+            try:
+                subprocess.run(["npx", "playwright", "test"], cwd=ROOT, check=True,
+                               env={**os.environ, "TEST_GATEWAY_URL": endpoint("gateway")})
+            finally:
+                for path, content in originals.items():
+                    if content is None:
+                        path.unlink(missing_ok=True)
+                    else:
+                        path.write_bytes(content)
+        print("All product integration checks passed.", flush=True)
     except BaseException:
         command("logs", "--tail", "40")
         raise

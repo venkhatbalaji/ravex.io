@@ -62,11 +62,25 @@ toggle mechanics as the player app.
 
 Three pages:
 
-- **Markets** (`/markets`) — create, lock, and settle markets, with a
+- **Markets** (`/markets`) — create, lock, resolve, and cancel markets, with a
   category picker. This is where `apps/platform`'s create/lock/settle
   controls moved *from* — the player app is read/stake-only now.
 - **Categories** (`/categories`) — create, rename, delete.
 - **Branding** (`/branding`) — the theme form and the copy-override table.
+
+## Recording a result or cancellation
+
+Lock a market before choosing the winning outcome. Enter a scorecard reference
+or other evidence and select **Record result and pay**. The result is final:
+conflicting later submissions are rejected. The table shows `settling` until
+Wallet confirms the full payout, then `settled` with completion time.
+
+For an open or locked market, enter the cancellation reason and select
+**Cancel and refund**. Status moves through `refunding` to `cancelled`.
+Cancellation and results with no stakes on the winner return original stakes
+in full. During a dependency outage, leave the recorded decision in place;
+workers retry it after recovery. Players see confirmed returns in
+**My predictions**. [Details and tests](settlement-and-testing.md).
 
 ## How the player app picks it up
 
@@ -104,6 +118,8 @@ same list with human-readable labels — this is its source of truth.
 | Key | Default | Where it renders |
 | --- | --- | --- |
 | `nav.linkMarkets` | Markets | Nav bar link |
+| `nav.linkPredictions` | My predictions | Nav bar link |
+| `predictions.heading` | My predictions | Prediction history heading |
 | `nav.linkWallet` | Wallet | Nav bar link |
 | `nav.logIn` | Log in | Nav bar link |
 | `nav.register` | Register | Nav bar button |

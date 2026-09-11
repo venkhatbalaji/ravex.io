@@ -39,9 +39,13 @@ export interface Market {
   title: string;
   description: string;
   eventStartAt: string;
-  status: "open" | "locked" | "settled";
+  status: "open" | "locked" | "settling" | "refunding" | "settled" | "cancelled";
   winningOutcomeId: string | null;
   categoryId: string | null;
+  resultSource: string;
+  resolvedBy: string | null;
+  resolutionRequestedAt: string | null;
+  resolvedAt: string | null;
   outcomes: Outcome[];
 }
 
@@ -90,8 +94,11 @@ export const api = {
     ),
   lockMarket: (token: string, id: string) =>
     request<{ id: string; status: string }>(`/markets/${id}/lock`, { method: "POST" }, token),
-  settleMarket: (token: string, id: string, winningOutcomeId: string) =>
-    request<Market>(`/markets/${id}/settle`, { method: "POST", body: JSON.stringify({ winningOutcomeId }) }, token),
+  settleMarket: (token: string, id: string, winningOutcomeId: string, source: string) =>
+    request<Market>(`/markets/${id}/settle`, { method: "POST", body: JSON.stringify({ winningOutcomeId, source }) }, token),
+
+  cancelMarket: (token: string, id: string, reason: string) =>
+    request<Market>(`/markets/${id}/cancel`, { method: "POST", body: JSON.stringify({ reason }) }, token),
 
   categories: () => request<Category[]>("/categories"),
   createCategory: (token: string, name: string) =>

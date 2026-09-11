@@ -41,10 +41,11 @@ func (c *HTTPClient) GetMarket(ctx context.Context, marketID string) (domain.Mar
 		return domain.Market{}, fmt.Errorf("catalog returned status %d", resp.StatusCode)
 	}
 	var dto struct {
-		ID           string    `json:"id"`
-		Status       string    `json:"status"`
-		EventStartAt time.Time `json:"eventStartAt"`
-		Outcomes     []struct {
+		WinningOutcomeID string    `json:"winningOutcomeId"`
+		ID               string    `json:"id"`
+		Status           string    `json:"status"`
+		EventStartAt     time.Time `json:"eventStartAt"`
+		Outcomes         []struct {
 			ID string `json:"id"`
 		} `json:"outcomes"`
 	}
@@ -54,7 +55,7 @@ func (c *HTTPClient) GetMarket(ctx context.Context, marketID string) (domain.Mar
 	if !strings.EqualFold(dto.ID, marketID) || dto.Status == "" || dto.EventStartAt.IsZero() || len(dto.Outcomes) < 2 {
 		return domain.Market{}, fmt.Errorf("catalog returned an incomplete or mismatched market")
 	}
-	market := domain.Market{ID: dto.ID, Status: dto.Status, EventStartAt: dto.EventStartAt}
+	market := domain.Market{WinningOutcomeID: dto.WinningOutcomeID, ID: dto.ID, Status: dto.Status, EventStartAt: dto.EventStartAt}
 	for _, outcome := range dto.Outcomes {
 		if outcome.ID == "" {
 			return domain.Market{}, fmt.Errorf("catalog returned an empty outcome ID")

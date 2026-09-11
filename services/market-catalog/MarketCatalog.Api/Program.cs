@@ -10,6 +10,7 @@ using Microsoft.OpenApi.Models;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddMarketCatalogInfrastructure(builder.Configuration);
+builder.Services.AddHostedService<MarketCatalog.Api.ResolutionWorker>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>

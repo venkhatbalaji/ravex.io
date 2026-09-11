@@ -34,5 +34,13 @@ public sealed class HttpStakeAdmission : IStakeAdmission, IDisposable
         catch (TaskCanceledException) when (!ct.IsCancellationRequested) { throw new StakeAdmissionUnavailableException(); }
     }
 
+    public async Task<bool> ResolveAsync(Guid marketId, CancellationToken ct)
+    {
+        using var response = await _client.PostAsync($"/internal/pools/{marketId}/resolve", null, ct);
+        if (response.StatusCode == HttpStatusCode.Accepted) return false;
+        response.EnsureSuccessStatusCode();
+        return true;
+    }
+
     public void Dispose() => _client.Dispose();
 }

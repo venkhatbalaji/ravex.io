@@ -73,6 +73,7 @@ services:
     environment:
       INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:-dev-only-internal-service-key-change-me!}
       SETTLEMENT_SERVICE_URL: "http://settlement-engine:8080"
+      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:-dev-only-signing-key-change-me-please-32bytes!}
       MARKET_CATALOG_DB_CONNECTION: "Host=postgres;Port=5432;Database=ravex;Username=ravex;Password=ravex_dev;Search Path=market_catalog"
     depends_on:
       postgres:

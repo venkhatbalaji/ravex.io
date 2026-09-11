@@ -1,6 +1,7 @@
 # JavaScript / Next.js dependencies and build output
 node_modules/
 .next/
+.next-e2e/
 .turbo/
 dist/
 out/

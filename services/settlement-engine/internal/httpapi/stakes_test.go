@@ -100,7 +100,7 @@ func TestStakeAdmission(t *testing.T) {
 			req.Header.Set("Authorization", "Bearer test-token")
 			req.Header.Set("Idempotency-Key", uuid.NewString())
 			response := httptest.NewRecorder()
-			NewServer(useCase, identityclient.NewHTTPClient(identity.URL), "test-service-key").Routes().ServeHTTP(response, req)
+			NewServer(useCase, identityclient.NewHTTPClient(identity.URL), "test-service-key", nil).Routes().ServeHTTP(response, req)
 			if response.Code != tc.wantStatus {
 				t.Fatalf("status %d, want %d: %s", response.Code, tc.wantStatus, response.Body.String())
 			}

@@ -1,4 +1,5 @@
 using MarketCatalog.Domain.Entities;
+using MarketCatalog.Domain.Exceptions;
 using MarketCatalog.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
@@ -26,5 +27,9 @@ public sealed class MarketRepository : IMarketRepository
         await _db.SaveChangesAsync(ct);
     }
 
-    public Task SaveChangesAsync(CancellationToken ct = default) => _db.SaveChangesAsync(ct);
+    public async Task SaveChangesAsync(CancellationToken ct = default)
+    {
+        try { await _db.SaveChangesAsync(ct); }
+        catch (DbUpdateConcurrencyException) { throw new InvalidMarketStateException("Market changed concurrently; refresh and retry."); }
+    }
 }

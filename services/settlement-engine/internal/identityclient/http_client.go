@@ -20,6 +20,12 @@ func NewHTTPClient(baseURL string) *HTTPClient {
 	return &HTTPClient{strings.TrimRight(baseURL, "/"), &http.Client{Timeout: 5 * time.Second}}
 }
 func (c *HTTPClient) CurrentUser(ctx context.Context, bearer string) (string, error) {
+	return c.current(ctx, bearer, false)
+}
+func (c *HTTPClient) CurrentAdmin(ctx context.Context, bearer string) (string, error) {
+	return c.current(ctx, bearer, true)
+}
+func (c *HTTPClient) current(ctx context.Context, bearer string, admin bool) (string, error) {
 	if !strings.HasPrefix(bearer, "Bearer ") {
 		return "", domain.ErrUnauthorized
 	}
@@ -40,7 +46,8 @@ func (c *HTTPClient) CurrentUser(ctx context.Context, bearer string) (string, er
 		return "", fmt.Errorf("identity returned status %d", resp.StatusCode)
 	}
 	var user struct {
-		ID string `json:"id"`
+		ID   string `json:"id"`
+		Role string `json:"role"`
 	}
 	if err = json.NewDecoder(resp.Body).Decode(&user); err != nil {
 		return "", err
@@ -48,6 +55,9 @@ func (c *HTTPClient) CurrentUser(ctx context.Context, bearer string) (string, er
 	id, err := uuid.Parse(user.ID)
 	if err != nil || id == uuid.Nil {
 		return "", fmt.Errorf("identity returned an invalid user ID")
+	}
+	if admin && user.Role != "Admin" {
+		return "", domain.ErrForbidden
 	}
 	return id.String(), nil
 }

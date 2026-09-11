@@ -4,5 +4,8 @@ public enum MarketStatus
 {
     Open,
     Locked,
-    Settled
+    Settled,
+    Settling,
+    Refunding,
+    Cancelled
 }

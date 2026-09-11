@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using MarketCatalog.Application.Contracts;
 using MarketCatalog.Application.Exceptions;
 using MarketCatalog.Application.UseCases;
@@ -27,8 +28,11 @@ public static class MarketEndpoints
         group.MapPost("/{id:guid}/lock", async (Guid id, ILockMarketUseCase useCase) =>
             await Try(() => useCase.ExecuteAsync(id))).RequireAuthorization("admin");
 
-        group.MapPost("/{id:guid}/settle", async (Guid id, SettleMarketRequest request, ISettleMarketUseCase useCase) =>
-            await Try(() => useCase.ExecuteAsync(id, request))).RequireAuthorization("admin");
+        group.MapPost("/{id:guid}/settle", async (Guid id, SettleMarketRequest request, ClaimsPrincipal principal, ISettleMarketUseCase useCase) =>
+            await Try(() => useCase.ExecuteAsync(id, request, Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!)))).RequireAuthorization("admin");
+        group.MapPost("/{id:guid}/cancel", async (Guid id, CancelMarketRequest request, ClaimsPrincipal principal, ICancelMarketUseCase useCase) =>
+            await Try(() => useCase.ExecuteAsync(id, request, Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!)))).RequireAuthorization("admin");
+
     }
 
     private static async Task<IResult> Try(Func<Task<MarketDto>> action)

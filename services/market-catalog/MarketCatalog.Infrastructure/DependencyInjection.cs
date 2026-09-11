@@ -30,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<ICreateMarketUseCase, CreateMarketUseCase>();
         services.AddScoped<ILockMarketUseCase, LockMarketUseCase>();
         services.AddScoped<ISettleMarketUseCase, SettleMarketUseCase>();
+        services.AddScoped<ICancelMarketUseCase, SettleMarketUseCase>();
 
         services.AddScoped<IListCategoriesUseCase, ListCategoriesUseCase>();
         services.AddScoped<ICreateCategoryUseCase, CreateCategoryUseCase>();

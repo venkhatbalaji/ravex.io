@@ -10,13 +10,13 @@ market lifecycle.
 | Area | Implemented | Missing |
 | --- | --- | --- |
 | Identity | Email/password registration, login, JWT, roles (`Player`/`Admin`), controlled admin bootstrap | Session renewal, abuse controls, an admin-invite flow beyond the bootstrap |
-| Wallet | Earned coins, atomic ledger debits, durable debit decisions, serialized reward claims | Winner credits, refunds, verified ad/referral rewards |
-| Catalog | Create, list, lock, settle markets; categories; admin-only writes at gateway and service | Fixtures, cancellation, result audit trail |
-| Settlement | Durable player stakes, admission gates, debit recovery, pool totals, payout ratio | Wallet payouts, refunds, result orchestration, admin role check on the settlement computation path |
+| Wallet | Earned coins, atomic debits and market payouts/refunds, durable receipts, serialized reward claims | Verified ad/referral rewards |
+| Catalog | Create, list, lock, resolve/cancel markets; categories; admin-only writes; immutable result evidence and actor | Fixtures, broader administrative audit trail |
+| Settlement | Durable stakes and payout plans, admission gates, debit/payout recovery, exact integer allocation, admin-only previews | Operational backlog dashboard |
 | Branding | Theme (brand name, logo URLs, two accent colors, one of four fonts) and a copy-override dictionary, both admin-only to write, public to read; `apps/platform` applies both at runtime | Logo upload/object storage (URLs only), true multi-tenant multi-brand hosting |
-| Platform | Login, registration, markets, stake form, wallet, dynamic branding/copy | Prediction history, rankings |
-| Admin | `apps/admin` — markets (create/lock/settle), categories, branding, admin-only login | Fixtures, cancellation workflow, audit trail viewer |
-| Infrastructure | Compose backend, PostgreSQL, Redis, NATS, gateway | Automated integration checks, readiness checks, operational monitoring |
+| Platform | Login, registration, markets, stake form, wallet, private prediction history, dynamic branding/copy | Rankings |
+| Admin | `apps/admin` — markets (create/lock/resolve/cancel), categories, branding, admin-only login | Fixtures, audit trail viewer |
+| Infrastructure | Compose backend, PostgreSQL, Redis, NATS, gateway, isolated integration/browser tests and CI workflow | Readiness checks, operational monitoring |
 
 The platform and admin frontends currently run separately with
 `npm run dev:platform` / `npm run dev:admin`; neither is a service in
@@ -39,8 +39,8 @@ contain the requested outcome. Invalid requests return 400, missing markets
 404, closed markets 409, and dependency failures 502. Catalog failures do
 not trigger a wallet debit.
 
-The next increment adds a durable admission gate to coordinate this check
-with market closure and removes the public Wallet debit primitive.
+The second increment added a durable admission gate to coordinate this check
+with market closure and removed the public Wallet debit primitive.
 
 ### Second increment: durable stake admission and wallet retry protection (implemented)
 
@@ -61,7 +61,7 @@ Implementation checklist:
   previous result; reusing its key with a different payload is rejected.
 - Make sufficient-balance checking and the two ledger entries one database
   transaction with account-level serialization. Apply the same atomicity
-  principle to once-per-day claims; the current check-then-write can race.
+  principle to once-per-day claims to prevent check-then-write races.
 - Replace the publicly callable debit primitive with a service-authorized
   operation bound to the admitted stake and verified player identity.
   Enforce this in Wallet, not just in gateway routing.
@@ -81,30 +81,28 @@ entries balance and accepted stakes reconcile with escrow.
 Historical in-memory pools are not imported automatically. Their old wallet
 debits remain, so reconcile them before replacing an existing environment.
 
-### Next increment: settlement, payouts, and refunds
+### Third increment: settlement, payouts, refunds, and history (implemented)
 
-- Persist one result and one payout plan per market. Only a trusted result
-  workflow can finalize it; a player cannot submit a winning outcome.
-- Calculate payouts per player using integer arithmetic. Record a deterministic
-  remainder allocation so the sum of payouts equals the distributable pool.
-- Credit winners from escrow with unique payout IDs. Retry partial processing
-  without paying anyone twice. Mark settlement complete only after every
-  planned transfer has been confirmed.
-- Define and implement cancellation, abandoned matches, ties, and a winning
-  outcome with no stakes. Proposed initial rule for cancelled markets and
-  zero winning stakes: return every accepted stake in full.
-- Reconcile accepted stakes, escrow debits, payouts, and refunds. Expose
-  stuck operations to administrators with a safe retry action.
+Catalog records an immutable result with evidence, administrator identity, and
+request/completion timestamps. Its worker coordinates persisted payout plans
+with Settlement; Wallet credits the whole market atomically and saves a
+receipt so retries cannot pay twice. Processing survives service restarts.
 
-Acceptance: two players stake on different outcomes; the winner receives
-the correct pool payout, the loser receives none, repeat settlement changes
-no balances, and cancellation refunds exactly once. Inject failures between
-each service call and prove recovery preserves the ledger totals.
+Payouts use integer arithmetic and deterministic largest-remainder allocation
+per accepted stake. Cancellation and a winning outcome with no accepted
+stakes refund every accepted stake in full. Operators can record results or
+cancel markets from Admin; players can follow pending, won, lost, and refunded
+predictions at `/predictions`.
+
+See [settlement contracts and testing](settlement-and-testing.md) for the
+allocation policy, recovery behavior, tests, and upgrade limitations. Dedicated
+tie rules, fixtures, and an operational retry/backlog dashboard remain future
+work; a tie can use a predefined outcome or an explicit cancellation policy.
 
 ## 2. Make market operations usable
 
-Build backend authorization alongside milestone 1, before exposing result
-or payout actions. Then add a dedicated `/admin` experience.
+Admin authorization and the separate `apps/admin` application are implemented.
+Remaining work centers on fixtures, publishing, and broader audit records.
 
 - Provision an administrator through a controlled setup operation; do not
   allow public registration to choose its role.
@@ -116,16 +114,15 @@ or payout actions. Then add a dedicated `/admin` experience.
   evidence, preview payouts, and view processing status.
 - Record the actor, action, timestamp, and result for every administrative
   mutation. Move create/lock/settle controls out of player-facing pages.
-- Add admin role checks to the settlement computation path. The platform now
-  sends a token, matching the gateway's authenticated pool POST routes.
+- Admin role checks on settlement previews are implemented at gateway and service.
 
 Acceptance: ordinary players get 403 on administrative actions; admins can
 complete the entire market lifecycle through the gateway with an audit trail.
 
 ## 3. Build the player experience
 
-- Add `/predictions` with pending, won, lost, and refunded entries backed by
-  durable player stakes. Show stake, outcome, result, and confirmed payout.
+- Implemented: `/predictions` with private, paginated pending, won, lost, and
+  refunded entries, stake details, and confirmed payout.
 - Improve discovery with upcoming/live/completed filters, category selection,
   pagination, and useful empty states.
 - Show match times clearly in IST and enforce cutoffs on the server. Disable
@@ -166,11 +163,11 @@ current services before adding more microservices.
 
 ## Verify the implemented increments
 
-From the repository root, with Docker and Python 3 available:
+From the repository root, with Docker, Python 3, and Node dependencies installed:
 
 ```bash
-python3 services/tests/stake_lifecycle.py
-npm run typecheck --workspace=@ravex/platform
+npx playwright install chromium
+npm run test:all
 ```
 
 The test runner builds an isolated Compose project, exercises real services
