@@ -32,7 +32,8 @@ services never query another service's tables.
 Clients call gateway `:5100`. Other ports are exposed for local debugging.
 Gateway routes `/auth/*` and `/me` to Identity, `/wallet/*` to Wallet,
 `/markets/*` and `/categories/*` to Catalog, `/pools/*` and `/predictions/*` to Settlement, and
-`/branding/*` to Branding. `/internal/*` endpoints are not routed by Gateway
+`/branding/*` to Branding. `/operations/settlement` is an admin-only recovery
+backlog view owned by Settlement. `/internal/*` endpoints are not routed by Gateway
 and require `X-Service-Key` at the owning service.
 
 Every write route on Catalog and Branding — creating/locking/settling a
@@ -43,7 +44,8 @@ already used for `authenticated` routes. Read routes on both stay public. See
 [Roles, categories, and white-label branding](#roles-categories-and-white-label-branding).
 
 The .NET services expose `/swagger`; Settlement exposes `/swagger` and
-`/openapi.json`. Each service has `/health`. PostgreSQL schemas are `identity`,
+`/openapi.json`. Each service has `/health` for liveness and `/health/ready` for dependency
+readiness. See the [operations runbook](../docs/operations.md). PostgreSQL schemas are `identity`,
 `wallet`, `market_catalog`, `settlement`, and `branding` in the local `ravex`
 database. Redis and NATS are available in Compose but currently unused.
 

@@ -60,11 +60,13 @@ admin tool would look different from every other one. It has its own fixed,
 neutral palette (see `apps/admin/app/globals.css`) with the same dark/light
 toggle mechanics as the player app.
 
-Three pages:
+Four pages:
 
 - **Markets** (`/markets`) — create, lock, resolve, and cancel markets, with a
   category picker. This is where `apps/platform`'s create/lock/settle
   controls moved *from* — the player app is read/stake-only now.
+- **Operations** (`/operations`) — pending coin transfers, oldest pending age,
+  paginated recovery backlog and Catalog decisions awaiting completion.
 - **Categories** (`/categories`) — create, rename, delete.
 - **Branding** (`/branding`) — the theme form and the copy-override table.
 

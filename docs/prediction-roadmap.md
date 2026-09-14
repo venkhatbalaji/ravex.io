@@ -5,6 +5,9 @@ release uses earned virtual coins. Cricket is a proposed first category,
 based on the existing MI vs CSK example; other categories can use the same
 market lifecycle.
 
+See the [enterprise requirements register](enterprise-readiness.md) for release
+gates, ownership, acceptance criteria and remaining gaps.
+
 ## Current baseline
 
 | Area | Implemented | Missing |
@@ -12,11 +15,11 @@ market lifecycle.
 | Identity | Email/password registration, login, JWT, roles (`Player`/`Admin`), controlled admin bootstrap | Session renewal, abuse controls, an admin-invite flow beyond the bootstrap |
 | Wallet | Earned coins, atomic debits and market payouts/refunds, durable receipts, serialized reward claims | Verified ad/referral rewards |
 | Catalog | Create, list, lock, resolve/cancel markets; categories; admin-only writes; immutable result evidence and actor | Fixtures, broader administrative audit trail |
-| Settlement | Durable stakes and payout plans, admission gates, debit/payout recovery, exact integer allocation, admin-only previews | Operational backlog dashboard |
+| Settlement | Durable stakes and payout plans, admission gates, debit/payout recovery, exact integer allocation, admin-only previews and backlog snapshots | Production metrics and paging alerts |
 | Branding | Theme (brand name, logo URLs, two accent colors, one of four fonts) and a copy-override dictionary, both admin-only to write, public to read; `apps/platform` applies both at runtime | Logo upload/object storage (URLs only), true multi-tenant multi-brand hosting |
 | Platform | Login, registration, markets, stake form, wallet, private prediction history, dynamic branding/copy | Rankings |
-| Admin | `apps/admin` — markets (create/lock/resolve/cancel), categories, branding, admin-only login | Fixtures, audit trail viewer |
-| Infrastructure | Compose backend, PostgreSQL, Redis, NATS, gateway, isolated integration/browser tests and CI workflow | Readiness checks, operational monitoring |
+| Admin | `apps/admin` — markets (create/lock/resolve/cancel), categories, branding, operational backlog, admin-only login | Fixtures, audit trail viewer |
+| Infrastructure | Compose backend, PostgreSQL, Redis, NATS, gateway, isolated integration/browser tests, CI workflow and database readiness | Production monitoring, alerting and deployment probes |
 
 The platform and admin frontends currently run separately with
 `npm run dev:platform` / `npm run dev:admin`; neither is a service in
@@ -98,6 +101,17 @@ See [settlement contracts and testing](settlement-and-testing.md) for the
 allocation policy, recovery behavior, tests, and upgrade limitations. Dedicated
 tie rules, fixtures, and an operational retry/backlog dashboard remain future
 work; a tie can use a predefined outcome or an explicit cancellation policy.
+
+### Fourth increment: operational visibility (implemented)
+
+Admin Operations shows pending debits, payout/refund plans, oldest pending age,
+and Catalog decisions awaiting completion. Its API is admin-only at Gateway
+and Settlement. All backend services now separate liveness from database-aware
+readiness; Gateway checks downstream readiness. Outage tests verify that
+unavailable databases fail readiness while processes remain live.
+
+See [operations runbook](operations.md). Paging alerts, production telemetry,
+complete administrative audit events and deployment orchestration remain open.
 
 ## 2. Make market operations usable
 

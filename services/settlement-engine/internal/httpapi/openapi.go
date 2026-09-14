@@ -12,6 +12,30 @@ const openAPISpec = `{
     "description": "Durable stake admission, idempotent coin payouts and refunds, and private player prediction history. Administrative results are recorded through Market Catalog; internal resolution endpoints require service authentication."
   },
   "paths": {
+    "/health/ready": {
+      "get": {
+        "summary": "Database readiness with a bounded probe",
+        "responses": {"200": {"description": "Ready"}, "503": {"description": "Database unavailable"}}
+      }
+    },
+    "/operations/settlement": {
+      "get": {
+        "summary": "Admin-only pending debit and payout backlog",
+        "description": "One database snapshot of counts, oldest pending time, and oldest-first rows. Excludes player identities and credentials. Processing can move items between offset pages. Responses are not cacheable.",
+        "security": [{"Bearer": []}],
+        "parameters": [
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 50}},
+          {"name": "offset", "in": "query", "schema": {"type": "integer", "minimum": 0, "maximum": 1000000, "default": 0}}
+        ],
+        "responses": {
+          "200": {"description": "Consistent recovery snapshot", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Operations"}}}},
+          "400": {"description": "Invalid pagination"},
+          "401": {"description": "Authentication required"},
+          "403": {"description": "Admin role required"},
+          "502": {"description": "Dependency unavailable"}
+        }
+      }
+    },
     "/health": {
       "get": {
         "summary": "Health check",
@@ -263,6 +287,30 @@ const openAPISpec = `{
       }
     },
     "schemas": {
+      "PendingOperation": {
+        "type": "object",
+        "required": ["id", "marketId", "kind", "amount", "createdAt", "updatedAt"],
+        "properties": {
+          "id": {"type": "string", "format": "uuid"},
+          "marketId": {"type": "string", "format": "uuid"},
+          "kind": {"type": "string", "enum": ["debit", "payout", "refund"]},
+          "amount": {"type": "integer", "format": "int64", "minimum": 0},
+          "createdAt": {"type": "string", "format": "date-time"},
+          "updatedAt": {"type": "string", "format": "date-time"}
+        }
+      },
+      "Operations": {
+        "type": "object",
+        "required": ["observedAt", "pendingDebits", "pendingResolutions", "oldestPendingAt", "items", "nextOffset"],
+        "properties": {
+          "observedAt": {"type": "string", "format": "date-time"},
+          "pendingDebits": {"type": "integer", "format": "int64", "minimum": 0},
+          "pendingResolutions": {"type": "integer", "format": "int64", "minimum": 0},
+          "oldestPendingAt": {"type": "string", "format": "date-time", "nullable": true},
+          "items": {"type": "array", "items": {"$ref": "#/components/schemas/PendingOperation"}},
+          "nextOffset": {"type": "integer", "nullable": true}
+        }
+      },
       "PoolSnapshot": {
         "type": "object",
         "properties": {

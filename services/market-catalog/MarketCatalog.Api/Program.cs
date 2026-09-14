@@ -67,6 +67,29 @@ app.UseSwaggerUI();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Liveness stays independent of dependencies; readiness checks this service's database.
+app.MapGet("/health/ready", async (MarketCatalogDbContext db, HttpContext context) =>
+{
+    context.Response.Headers.CacheControl = "no-store";
+    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
+    timeout.CancelAfter(TimeSpan.FromSeconds(2));
+    var ready = false;
+    try
+    {
+        // Use an independent connection so pooled sockets and EF retry policies
+        // cannot hide a database outage or extend the probe indefinitely.
+        var settings = new Npgsql.NpgsqlConnectionStringBuilder(db.Database.GetConnectionString())
+        { Pooling = false, Timeout = 2, CommandTimeout = 2, CancellationTimeout = 1000 };
+        await using var connection = new Npgsql.NpgsqlConnection(settings.ConnectionString);
+        await connection.OpenAsync(timeout.Token);
+        await using var probe = new Npgsql.NpgsqlCommand("SELECT 1", connection);
+        await probe.ExecuteScalarAsync(timeout.Token);
+        ready = true;
+    }
+    catch (Exception) { /* Return a minimal response; never expose connection details. */ }
+    return Results.Json(new { status = ready ? "ready" : "not_ready", service = "market-catalog" }, statusCode: ready ? 200 : 503);
+});
+
 app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "market-catalog" }));
 app.MapMarketEndpoints();
 app.MapCategoryEndpoints();

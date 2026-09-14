@@ -15,7 +15,10 @@ import (
 //go:embed migrations/*.sql
 var migrations embed.FS
 
-type PostgresRepository struct{ db *sql.DB }
+type PostgresRepository struct {
+	db         *sql.DB
+	connection string
+}
 
 func Open(ctx context.Context, connection string) (*PostgresRepository, error) {
 	db, err := sql.Open("postgres", connection)
@@ -24,7 +27,7 @@ func Open(ctx context.Context, connection string) (*PostgresRepository, error) {
 	}
 	db.SetMaxOpenConns(15)
 	db.SetMaxIdleConns(5)
-	repo := &PostgresRepository{db: db}
+	repo := &PostgresRepository{db: db, connection: connection}
 	if err = db.PingContext(ctx); err == nil {
 		err = repo.migrate(ctx)
 	}

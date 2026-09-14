@@ -42,11 +42,41 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 
+builder.Services.AddHttpClient("readiness", client => client.Timeout = TimeSpan.FromSeconds(4));
+
 var app = builder.Build();
 
 app.UseCors("platform");
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Every configured cluster needs at least one ready destination. Probes run
+// concurrently; a downstream outage must not make gateway liveness fail.
+app.MapGet("/health/ready", async (IHttpClientFactory clients, IConfiguration configuration, HttpContext context) =>
+{
+    context.Response.Headers.CacheControl = "no-store";
+    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
+    timeout.CancelAfter(TimeSpan.FromSeconds(5));
+    var client = clients.CreateClient("readiness");
+    async Task<bool> Probe(string? address)
+    {
+        if (string.IsNullOrWhiteSpace(address)) return false;
+        try
+        {
+            using var response = await client.GetAsync(address.TrimEnd('/') + "/health/ready", timeout.Token);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception) { return false; }
+    }
+    var clusters = configuration.GetSection("ReverseProxy:Clusters").GetChildren().ToArray();
+    var checks = await Task.WhenAll(clusters.Select(async cluster =>
+    {
+        var destinations = await Task.WhenAll(cluster.GetSection("Destinations").GetChildren().Select(d => Probe(d["Address"])));
+        return destinations.Any(ready => ready);
+    }));
+    var ready = checks.Length > 0 && checks.All(value => value);
+    return Results.Json(new { status = ready ? "ready" : "not_ready", service = "gateway" }, statusCode: ready ? 200 : 503);
+});
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "gateway" }));
 app.MapReverseProxy();

@@ -114,6 +114,10 @@ def verify_product_features(call, expect, eventually, command, sql, endpoint, ga
     command("stop", "wallet-ledger")
     expect(result(recovering), 200)
     eventually(lambda: sql(f"SELECT COUNT(*) FROM settlement.resolutions WHERE market_id='{recovering['id']}'") == "1", "payout plan was not persisted during wallet outage")
+    backlog = expect(call(gateway, "/operations/settlement", token=admin_token), 200)
+    operation = next(row for row in backlog["items"] if row["marketId"] == recovering["id"])
+    assert operation["kind"] == "payout" and operation["amount"] == 10
+    assert backlog["pendingResolutions"] >= 1
     history = expect(call(gateway, "/predictions/me", token=a), 200)["items"]
     assert next(p for p in history if p["marketId"] == recovering["id"])["result"] == "processing"
     command("stop", "market-catalog", "settlement-engine")
@@ -127,6 +131,7 @@ def verify_product_features(call, expect, eventually, command, sql, endpoint, ga
     # recognize that receipt and finish without paying again.
     command("start", "settlement-engine", "market-catalog")
     finished(recovering)
+    assert not any(row["marketId"] == recovering["id"] for row in expect(call(gateway, "/operations/settlement", token=admin_token), 200)["items"])
     assert [balance(t) for t in (a, b)] == [56, 50]
     assert expect(call(wallet, f'/internal/settlements/{recovering["id"]}', payment, headers={"X-Service-Key": service_key}), 200) == receipt
     conflict = {"kind": "refund", "payouts": plan["payouts"]}

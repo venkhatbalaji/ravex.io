@@ -3,6 +3,7 @@
 Use --project NAME to exercise an already-running test project without cleanup.
 """
 from product_features import verify_product_features
+from operations_features import verify_operations
 import argparse
 import concurrent.futures
 import datetime
@@ -210,6 +211,8 @@ def main():
         paid = sql('SELECT COALESCE(SUM("Total"),0) FROM wallet.settlement_receipts')
         assert int(accepted) - int(paid) == int(escrow), (accepted, paid, escrow)
         print("PASS: double-entry ledger and accepted-stake escrow reconcile", flush=True)
+
+        verify_operations(call, expect, eventually, command, endpoint, sql, admin_token, player)
 
         if not args.project:
             command("exec", "-T", "postgres", "createdb", "-U", "ravex", "settlement_tests")

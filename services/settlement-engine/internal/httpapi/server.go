@@ -15,17 +15,20 @@ import (
 )
 
 type Server struct {
+	operations  *service.OperationsService
 	settlement  *service.SettlementService
 	identity    domain.IdentityClient
 	serviceKey  string
 	resolutions *service.ResolutionService
 }
 
-func NewServer(settlement *service.SettlementService, identity domain.IdentityClient, serviceKey string, resolutions *service.ResolutionService) *Server {
-	return &Server{settlement, identity, serviceKey, resolutions}
+func NewServer(settlement *service.SettlementService, identity domain.IdentityClient, serviceKey string, resolutions *service.ResolutionService, operations *service.OperationsService) *Server {
+	return &Server{settlement: settlement, identity: identity, serviceKey: serviceKey, resolutions: resolutions, operations: operations}
 }
 func (s *Server) Routes() *http.ServeMux {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health/ready", s.handleReady)
+	mux.HandleFunc("GET /operations/settlement", s.handleOperations)
 	mux.HandleFunc("GET /predictions/me", s.handlePredictions)
 	mux.HandleFunc("POST /internal/pools/{marketId}/resolve", s.handleResolve)
 	mux.HandleFunc("GET /health", s.handleHealth)

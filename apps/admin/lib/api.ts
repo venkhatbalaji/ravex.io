@@ -70,7 +70,17 @@ export interface CopyOverride {
   value: string;
 }
 
+export interface Operations {
+  observedAt: string;
+  pendingDebits: number;
+  pendingResolutions: number;
+  oldestPendingAt: string | null;
+  items: { id: string; marketId: string; kind: "debit" | "payout" | "refund"; amount: number; createdAt: string; updatedAt: string }[];
+  nextOffset: number | null;
+}
+
 export const api = {
+  operations: (token: string, offset = 0) => request<Operations>(`/operations/settlement?limit=50&offset=${offset}`, {}, token),
   login: (email: string, password: string) =>
     request<{ accessToken: string; user: { id: string; email: string; displayName: string; role: string } }>(
       "/auth/login",

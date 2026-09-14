@@ -42,7 +42,7 @@ func main() {
 	identity := identityclient.NewHTTPClient(env("IDENTITY_SERVICE_URL", "http://localhost:5101"))
 	useCase := service.NewSettlementService(repo, wallet, markets)
 	resolutions := service.NewResolutionService(repo, wallet, markets)
-	server := &http.Server{Addr: ":8080", Handler: httpapi.NewServer(useCase, identity, key, resolutions).Routes(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}
+	server := &http.Server{Addr: ":8080", Handler: httpapi.NewServer(useCase, identity, key, resolutions, service.NewOperationsService(repo)).Routes(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}
 	resolutionDone := make(chan struct{})
 	go func() { defer close(resolutionDone); resolutions.Recover(ctx) }()
 	recoveryDone := make(chan struct{})

@@ -90,6 +90,16 @@ test("admin results and cancellation update the player's history and wallet", as
   await adminPage.getByRole("combobox", { name: "Font", exact: true }).selectOption(originalFont);
   await adminPage.getByRole("button", { name: "Save theme", exact: true }).click();
   await expect(adminPage.getByText("Theme saved — reload the player app to see it.")).toBeVisible();
+  await adminPage.getByRole("link", { name: "Operations", exact: true }).click();
+  await expect(adminPage.getByRole("heading", { name: "Operations", exact: true })).toBeVisible();
+  await expect(adminPage.getByText("No pending coin transfers.", { exact: true })).toBeVisible();
+  await expect(adminPage.getByText("No results awaiting completion.", { exact: true })).toBeVisible();
+  await adminPage.route("**/operations/settlement?*", route => route.fulfill({ status: 503, contentType: "application/json", body: '{"error":"Unavailable"}' }));
+  await adminPage.getByRole("button", { name: "Refresh", exact: true }).click();
+  await expect(adminPage.getByRole("alert").filter({ hasText: "Cannot refresh recovery backlog" })).toBeVisible();
+  await adminPage.unroute("**/operations/settlement?*");
+  await adminPage.reload();
+  await expect(adminPage.getByRole("heading", { name: "Operations", exact: true })).toBeVisible();
   expect(errors).toEqual([]);
   await playerContext.close(); await adminContext.close();
 });
