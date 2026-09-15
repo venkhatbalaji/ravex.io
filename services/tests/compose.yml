@@ -74,10 +74,24 @@ services:
       context: ../..
       dockerfile: services/gateway/Dockerfile
     environment:
+      RequestLimits__AuthPermits: "1000"
+      RequestLimits__EarnPermits: "1000"
+      RequestLimits__StakePermits: "1000"
       Cors__AllowedOrigins__0: "http://localhost:3001"
       Cors__AllowedOrigins__1: "http://localhost:3002"
       Cors__AllowedOrigins__2: "http://localhost:13001"
       Cors__AllowedOrigins__3: "http://localhost:13002"
+    ports: ["127.0.0.1::8080"]
+    depends_on: [identity, wallet-ledger, market-catalog, settlement-engine, branding]
+  limited-gateway:
+    build:
+      context: ../..
+      dockerfile: services/gateway/Dockerfile
+    environment:
+      RequestLimits__WindowSeconds: "10"
+      RequestLimits__AuthPermits: "3"
+      RequestLimits__EarnPermits: "3"
+      RequestLimits__StakePermits: "3"
     ports: ["127.0.0.1::8080"]
     depends_on: [identity, wallet-ledger, market-catalog, settlement-engine, branding]
   go-tests:

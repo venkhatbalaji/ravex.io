@@ -49,6 +49,12 @@ readiness. See the [operations runbook](../docs/operations.md). PostgreSQL schem
 `wallet`, `market_catalog`, `settlement`, and `branding` in the local `ravex`
 database. Redis and NATS are available in Compose but currently unused.
 
+## Request limits
+
+Gateway applies separate per-process quotas to authentication, wallet and pool
+POST requests. Throttled requests return 429 with Retry-After. See
+[configuration, tests and deployment limits](../docs/request-limits.md).
+
 ## Stake admission and recovery
 
 1. The client sends `POST /pools/{marketId}/stakes` with its bearer token,
@@ -218,6 +224,6 @@ command. See [test coverage](../docs/settlement-and-testing.md#verification).
 
 - Fixtures, automatic result feeds, rankings, and an admin audit/backlog viewer.
 - Ad/referral rewards are disabled for direct claims. Provider verification,
-  rate limits and broader fraud controls remain to build. See [reward contracts](../docs/rewards.md).
+  distributed abuse limits and broader fraud controls remain to build. See [reward contracts](../docs/rewards.md).
 - Historical in-memory pools and already-settled legacy markets are not
   automatically migrated or paid. Reconcile them before an upgrade.

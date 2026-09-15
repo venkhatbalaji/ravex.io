@@ -124,6 +124,14 @@ survives restarts; ledger checks and credits remain serialized and atomic.
 See [reward contracts](rewards.md). Provider verification, referral qualification,
 rate limits, and broader fraud controls remain separate requirements.
 
+### Sixth increment: gateway request limits (implemented)
+
+Authentication, wallet writes and prediction writes have separate configurable
+quotas with 429/Retry-After responses. Keys use the connection IP or validated
+user identity, and throttled prediction retries retain their original key.
+See [request-limit contracts](request-limits.md). Counters are per process;
+distributed enforcement and production proxy trust remain open requirements.
+
 ## 2. Make market operations usable
 
 Admin authorization and the separate `apps/admin` application are implemented.

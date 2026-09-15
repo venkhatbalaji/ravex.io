@@ -5,6 +5,7 @@ Use --project NAME to exercise an already-running test project without cleanup.
 from product_features import verify_product_features
 from operations_features import verify_operations
 from reward_features import verify_rewards
+from request_limits import verify_request_limits
 import argparse
 import concurrent.futures
 import datetime
@@ -211,6 +212,8 @@ def main():
         paid = sql('SELECT COALESCE(SUM("Total"),0) FROM wallet.settlement_receipts')
         assert int(accepted) - int(paid) == int(escrow), (accepted, paid, escrow)
         print("PASS: double-entry ledger and accepted-stake escrow reconcile", flush=True)
+
+        verify_request_limits(call, expect, eventually, endpoint, player, market)
 
         verify_rewards(call, expect, command, sql, endpoint, admin_token, player)
 

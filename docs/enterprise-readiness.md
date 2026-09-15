@@ -61,7 +61,7 @@ be replaced with named owners during release planning.
 | SEC-04 | Session renewal, revocation and logout | Partial | JWT login and reload restoration work; rotation, revocation and all-device logout remain | Identity/frontend |
 | SEC-05 | Browser token and XSS protection | Open | Review localStorage token exposure; choose cookie/BFF or other session design, CSP and CSRF controls as applicable | Security/frontend |
 | SEC-06 | Password reset and email verification | Open | Expiring one-use tokens, enumeration resistance, rate limits and mail delivery evidence | Identity |
-| SEC-07 | Login, registration, earn and stake abuse limits | Open — beta blocker | Per-identity/IP policies, distributed limits, proxy trust, retry behavior and load tests | Gateway/security |
+| SEC-07 | Login, registration, earn and stake abuse limits | Partial | Per-process gateway quotas, 429/Retry-After and spoof-resistant keys implemented; distributed/edge limits, trusted-proxy deployment, service-level controls and load tests remain | Gateway/security |
 | SEC-08 | Production secrets and signing-key rotation | Open — production blocker | Reject development credentials; secret-manager integration and tested key rotation | Platform/security |
 | SEC-09 | Service identity and network isolation | Partial | Internal key enforced; distinct service credentials, rotation, TLS/mTLS and private backend networks remain | Platform |
 | SEC-10 | Least-privilege database roles | Open — production blocker | Separate service and migration principals; prohibit cross-schema writes | Platform/backend |
@@ -132,6 +132,12 @@ amounts and recipients, read-only claim availability, concurrent daily claims,
 restart persistence, simulated UTC reset, and the browser claim/reload flow.
 Provider integration remains unimplemented and provider rewards remain disabled.
 See [reward contracts](rewards.md).
+
+On 2026-09-15, the gateway-limit increment passed local `npm run test:all`,
+including quotas, forwarded-header spoof resistance, user isolation, retry
+headers, reset behavior, and the existing backend/Chromium regressions.
+The pushed reward commit `4892bfa` also passed GitHub workflow `34932079656`.
+See [request limits](request-limits.md) for the per-process and proxy boundaries.
 
 A beta release requires, at minimum, keeping unverified rewards disabled, agreeing
 eligibility/terms, securing deployment credentials/networks, assigning support

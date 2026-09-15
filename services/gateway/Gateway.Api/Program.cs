@@ -1,4 +1,5 @@
 using System.Text;
+using Gateway.Api;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
@@ -11,7 +12,8 @@ builder.Services.AddCors(options => options.AddPolicy("platform", policy => poli
     // PUT/DELETE are here for apps/admin (theme, copy, and category updates) —
     // apps/platform itself only ever sends GET/POST.
     .WithMethods("GET", "POST", "PUT", "DELETE")
-    .WithHeaders("Content-Type", "Authorization", "Idempotency-Key")));
+    .WithHeaders("Content-Type", "Authorization", "Idempotency-Key")
+    .WithExposedHeaders("Retry-After")));
 
 var jwtSigningKey = builder.Configuration["JWT_SIGNING_KEY"] ?? "dev-only-signing-key-change-me-please-32bytes!";
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -31,8 +33,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 // A route only ends up gated by this when its appsettings.json entry sets
 // "AuthorizationPolicy": "authenticated" or "admin" — routes without one
-// stay exactly as open as the backend service they proxy to; the gateway
-// never gets stricter than the service behind it on its own.
+// remain public. Request quotas below are an additional gateway control;
+// owning services still enforce their authorization and ledger invariants.
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("authenticated", policy => policy.RequireAuthenticatedUser());
@@ -44,11 +46,14 @@ builder.Services.AddReverseProxy()
 
 builder.Services.AddHttpClient("readiness", client => client.Timeout = TimeSpan.FromSeconds(4));
 
+builder.Services.AddRequestLimits(builder.Configuration);
+
 var app = builder.Build();
 
 app.UseCors("platform");
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 // Every configured cluster needs at least one ready destination. Probes run
 // concurrently; a downstream outage must not make gateway liveness fail.
