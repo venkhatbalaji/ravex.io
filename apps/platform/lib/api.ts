@@ -99,7 +99,15 @@ export interface Prediction {
   createdAt: string;
 }
 
+export interface RewardOption {
+  reason: "daily_login";
+  amount: number;
+  available: boolean;
+  nextAvailableAt: string | null;
+}
+
 export const api = {
+  rewards: (token: string) => request<{ observedAt: string; items: RewardOption[] }>("/wallet/me/rewards", {}, token),
   predictions: (token: string, offset = 0) =>
     request<{ items: Prediction[]; nextOffset: number | null }>(`/predictions/me?limit=20&offset=${offset}`, {}, token),
   register: (email: string, password: string, displayName: string) =>

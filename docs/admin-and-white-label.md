@@ -137,13 +137,14 @@ same list with human-readable labels — this is its source of truth.
 | `market.stakeButton` | Stake | Market detail page (only the base state — "Checking…" and "Check prediction" are transient idempotent-retry states, not brand copy) |
 | `wallet.heading` | Wallet | Wallet page |
 | `wallet.earnDailyLogin` | Daily login bonus | Wallet page earn button |
-| `wallet.earnRewardedAd` | Watch a rewarded ad | Wallet page earn button |
-| `wallet.earnReferral` | Referral bonus | Wallet page earn button |
 | `wallet.recentActivity` | Recent activity | Wallet page section heading |
 | `auth.loginHeading` | Log in | Login page |
 | `auth.registerHeading` | Create an account | Register page |
 | `auth.noAccount` | No account? | Login page |
 | `auth.haveAccount` | Already have an account? | Register page |
+
+The former `wallet.earnRewardedAd` and `wallet.earnReferral` keys are no longer
+read by the player app. Stored overrides can remain, but do not enable rewards.
 
 ## Extending it
 

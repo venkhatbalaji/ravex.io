@@ -11,12 +11,22 @@ public static class WalletEndpoints
     {
         var group = app.MapGroup("/wallet/me").RequireAuthorization();
 
-        group.MapPost("/earn", async (EarnRequest request, ClaimsPrincipal principal, IEarnCoinsUseCase useCase) =>
+        group.MapGet("/rewards", async (ClaimsPrincipal principal, GetRewardsUseCase useCase, HttpContext context) =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            return Results.Ok(await useCase.ExecuteAsync(CurrentUserId(principal), context.RequestAborted));
+        });
+
+        group.MapPost("/earn", async (EarnRequest request, ClaimsPrincipal principal, IEarnCoinsUseCase useCase, HttpContext context) =>
         {
             try
             {
-                var result = await useCase.ExecuteAsync(CurrentUserId(principal), request);
+                var result = await useCase.ExecuteAsync(CurrentUserId(principal), request, context.RequestAborted);
                 return Results.Ok(result);
+            }
+            catch (RewardVerificationRequiredException ex)
+            {
+                return Results.Json(new { error = ex.Message }, statusCode: 403);
             }
             catch (UnknownEarnReasonException ex)
             {

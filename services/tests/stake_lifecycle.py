@@ -4,6 +4,7 @@ Use --project NAME to exercise an already-running test project without cleanup.
 """
 from product_features import verify_product_features
 from operations_features import verify_operations
+from reward_features import verify_rewards
 import argparse
 import concurrent.futures
 import datetime
@@ -163,11 +164,10 @@ def main():
         print("PASS: parallel stakes cannot overdraw the wallet", flush=True)
 
         recovery_user, recovery_token = player()
-        expect(call(gateway, "/wallet/me/earn", {"reason": "daily_login"}, recovery_token), 200)
         rejected_id = str(uuid.uuid4())
-        debit_payload = {"userId": recovery_user, "marketId": item["id"], "outcomeId": item["outcomes"][0]["id"], "amount": 1000}
+        debit_payload = {"userId": recovery_user, "marketId": item["id"], "outcomeId": item["outcomes"][0]["id"], "amount": 25}
         rejected = expect(call(wallet, f"/internal/stakes/{rejected_id}", debit_payload, headers={"X-Service-Key": KEY}), 402)
-        expect(call(gateway, "/wallet/me/earn", {"reason": "referral"}, recovery_token), 200)
+        expect(call(gateway, "/wallet/me/earn", {"reason": "daily_login"}, recovery_token), 200)
         assert expect(call(wallet, f"/internal/stakes/{rejected_id}", debit_payload, headers={"X-Service-Key": KEY}), 402) == rejected
         expect(call(wallet, f"/internal/stakes/{rejected_id}", {**debit_payload, "amount": 1}, headers={"X-Service-Key": KEY}), 409)
         print("PASS: wallet rejection is durable and conflicting replay is rejected", flush=True)
@@ -180,10 +180,10 @@ def main():
         sql(f"INSERT INTO settlement.market_gates (market_id) VALUES ('{recovery_market['id']}'); INSERT INTO settlement.stakes (id,user_id,idempotency_key,market_id,outcome_id,amount) VALUES ('{stake_id}','{recovery_user}','{recovery_key}','{recovery_market['id']}','{recovery_market['outcomes'][0]['id']}',10)")
         debit_payload = {"userId": recovery_user, "marketId": recovery_market["id"], "outcomeId": recovery_market["outcomes"][0]["id"], "amount": 10}
         decision = expect(call(wallet, f"/internal/stakes/{stake_id}", debit_payload, headers={"X-Service-Key": KEY}), 200)
-        assert balance(recovery_token) == 140
+        assert balance(recovery_token) == 40
         command("start", "settlement-engine")
         eventually(lambda: (call(gateway, f'/pools/{recovery_market["id"]}')[1] or {}).get("totalPool") == 10, "worker did not recover committed debit")
-        assert balance(recovery_token) == 140
+        assert balance(recovery_token) == 40
         assert expect(call(wallet, f"/internal/stakes/{stake_id}", debit_payload, headers={"X-Service-Key": KEY}), 200) == decision
         expect(predict(recovery_token, recovery_market, recovery_key), 200)
         print("PASS: restart recovers a committed debit without a second charge", flush=True)
@@ -197,9 +197,9 @@ def main():
         command("start", "wallet-ledger")
         eventually(lambda: predict(recovery_token, outage_market, outage_key)[0] == 200, "pending stake not recovered after wallet outage")
         expect(lock(outage_market["id"]), 200)
-        assert balance(recovery_token) == 130
+        assert balance(recovery_token) == 30
         command("restart", "settlement-engine", "wallet-ledger")
-        eventually(lambda: predict(recovery_token, outage_market, outage_key)[0] == 200 and balance(recovery_token) == 130, "restart lost durable result")
+        eventually(lambda: predict(recovery_token, outage_market, outage_key)[0] == 200 and balance(recovery_token) == 30, "restart lost durable result")
         print("PASS: outage recovery, market drain, and repeated restart", flush=True)
 
         verify_product_features(call, expect, eventually, command, sql, endpoint, gateway, wallet, settlement, admin_token, player, market, predict, balance, lock, KEY)
@@ -211,6 +211,8 @@ def main():
         paid = sql('SELECT COALESCE(SUM("Total"),0) FROM wallet.settlement_receipts')
         assert int(accepted) - int(paid) == int(escrow), (accepted, paid, escrow)
         print("PASS: double-entry ledger and accepted-stake escrow reconcile", flush=True)
+
+        verify_rewards(call, expect, command, sql, endpoint, admin_token, player)
 
         verify_operations(call, expect, eventually, command, endpoint, sql, admin_token, player)
 

@@ -217,7 +217,7 @@ command. See [test coverage](../docs/settlement-and-testing.md#verification).
 ## Remaining product gaps
 
 - Fixtures, automatic result feeds, rankings, and an admin audit/backlog viewer.
-- Ad/referral earn reasons are accepted from the caller without independent
-  event verification. Rate limits and operational monitoring are not built.
+- Ad/referral rewards are disabled for direct claims. Provider verification,
+  rate limits and broader fraud controls remain to build. See [reward contracts](../docs/rewards.md).
 - Historical in-memory pools and already-settled legacy markets are not
   automatically migrated or paid. Reconcile them before an upgrade.

@@ -13,7 +13,7 @@ gates, ownership, acceptance criteria and remaining gaps.
 | Area | Implemented | Missing |
 | --- | --- | --- |
 | Identity | Email/password registration, login, JWT, roles (`Player`/`Admin`), controlled admin bootstrap | Session renewal, abuse controls, an admin-invite flow beyond the bootstrap |
-| Wallet | Earned coins, atomic debits and market payouts/refunds, durable receipts, serialized reward claims | Verified ad/referral rewards |
+| Wallet | Earned coins, atomic debits and market payouts/refunds, durable receipts, serialized reward claims, server-reported daily availability, unverified rewards disabled | Verified ad/referral rewards |
 | Catalog | Create, list, lock, resolve/cancel markets; categories; admin-only writes; immutable result evidence and actor | Fixtures, broader administrative audit trail |
 | Settlement | Durable stakes and payout plans, admission gates, debit/payout recovery, exact integer allocation, admin-only previews and backlog snapshots | Production metrics and paging alerts |
 | Branding | Theme (brand name, logo URLs, two accent colors, one of four fonts) and a copy-override dictionary, both admin-only to write, public to read; `apps/platform` applies both at runtime | Logo upload/object storage (URLs only), true multi-tenant multi-brand hosting |
@@ -113,6 +113,17 @@ unavailable databases fail readiness while processes remain live.
 See [operations runbook](operations.md). Paging alerts, production telemetry,
 complete administrative audit events and deployment orchestration remain open.
 
+### Fifth increment: public reward policy and claim availability (implemented)
+
+Only the daily login bonus can be claimed directly. Wallet rejects ad/referral
+claims with 403, including requests from admins and forged verification fields.
+The wallet page reads server-owned amounts and availability, disables claimed
+rewards, and shows the next daily reset in IST. Daily eligibility uses UTC and
+survives restarts; ledger checks and credits remain serialized and atomic.
+
+See [reward contracts](rewards.md). Provider verification, referral qualification,
+rate limits, and broader fraud controls remain separate requirements.
+
 ## 2. Make market operations usable
 
 Admin authorization and the separate `apps/admin` application are implemented.
@@ -152,8 +163,8 @@ result without needing an admin or a direct API call.
 ## 4. Prepare a small beta
 
 - Keep the free-coin economy explicit in UI and configuration. Only grant
-  ad/referral rewards after server-verifiable events; the current earn API
-  accepts those reasons directly from the caller.
+  ad/referral rewards after server-verifiable events. Wallet now rejects direct
+  claims for those reasons; they stay disabled until verification exists.
 - Add rate limits, session expiry handling, restricted CORS, environment
   secrets, dependency readiness, structured logs, and request correlation.
 - Automate service tests and the full gateway journey in CI, including

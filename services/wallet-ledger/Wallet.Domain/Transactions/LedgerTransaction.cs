@@ -8,13 +8,13 @@ namespace Wallet.Domain.Transactions;
 /// </summary>
 public static class LedgerTransaction
 {
-    public static (LedgerEntry Debit, LedgerEntry Credit) Create(Guid fromAccountId, Guid toAccountId, long amount, string reason)
+    public static (LedgerEntry Debit, LedgerEntry Credit) Create(Guid fromAccountId, Guid toAccountId, long amount, string reason, DateTimeOffset? occurredAt = null)
     {
         if (amount <= 0)
             throw new ArgumentException("A ledger transaction amount must be positive.", nameof(amount));
 
         var transactionId = Guid.NewGuid();
-        var now = DateTimeOffset.UtcNow;
+        var now = occurredAt ?? DateTimeOffset.UtcNow;
         var debit = LedgerEntry.Create(transactionId, fromAccountId, -amount, reason, now);
         var credit = LedgerEntry.Create(transactionId, toAccountId, amount, reason, now);
         return (debit, credit);

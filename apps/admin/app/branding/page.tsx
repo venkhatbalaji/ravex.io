@@ -204,8 +204,6 @@ const COPY_KEYS: { key: string; label: string; default: string }[] = [
   { key: "market.stakeButton", label: "Market detail — stake button", default: "Stake" },
   { key: "wallet.heading", label: "Wallet — page heading", default: "Wallet" },
   { key: "wallet.earnDailyLogin", label: "Wallet — daily login button", default: "Daily login bonus" },
-  { key: "wallet.earnRewardedAd", label: "Wallet — rewarded ad button", default: "Watch a rewarded ad" },
-  { key: "wallet.earnReferral", label: "Wallet — referral button", default: "Referral bonus" },
   { key: "wallet.recentActivity", label: "Wallet — activity heading", default: "Recent activity" },
   { key: "auth.loginHeading", label: "Login page — heading", default: "Log in" },
   { key: "auth.registerHeading", label: "Register page — heading", default: "Create an account" },

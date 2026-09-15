@@ -45,7 +45,7 @@ be replaced with named owners during release planning.
 | PROD-05 | Fixtures, competitions, teams and result sources | Open | Stable fixture IDs, validated feeds, corrections policy and provenance | Product/catalog |
 | PROD-06 | Draft, review, publish and scheduled close | Open | Unpublished markets never accept stakes; schedule recovery tested | Catalog |
 | PROD-07 | Ties, voids, abandonment and disputes | Partial | Cancellation exists; publish explicit per-market rules and a dispute process | Product |
-| PROD-08 | Verified rewarded-ad/referral events | Open — beta blocker | Caller-selected earn reasons still grant coins; require signed, replay-protected provider events and anti-fraud rules | Wallet/security |
+| PROD-08 | Verified rewarded-ad/referral events | Partial — direct-claim abuse closed | Wallet rejects unverified ad/referral claims; provider rewards remain disabled until signed, replay-protected events and anti-fraud rules exist | Wallet/security |
 | PROD-09 | Reconciliation and discrepancy handling | Partial | Test suite reconciles ledger and escrow; scheduled production checks, alerting and investigation workflow remain | Wallet/operations |
 | PROD-10 | Search, category/status filtering and bounded lists | Partial | History/backlog paginated; catalog/admin market lists remain unbounded | Frontend/catalog |
 | PROD-11 | Rankings and notifications | Open | Versioned scoring/season/tie rules; opt-in channels and idempotent delivery | Product |
@@ -119,14 +119,21 @@ be replaced with named owners during release planning.
 ## Evidence and release gates
 
 The previous increment's GitHub workflow run `34569970676` passed. On
-2026-09-14, the current increment passed local `npm run test:all`: workspace
+2026-09-14, the operations increment passed local `npm run test:all`: workspace
 typechecks, real-service/PostgreSQL checks, Go tests/vet, and Chromium. This
 includes protected backlog pagination/privacy, stalled-connection deadlines,
 database pause/recovery, and browser stale-data warnings. No production
 deployment or new remote CI run is implied. See [operations runbook](operations.md) and
 [settlement/testing contracts](settlement-and-testing.md).
 
-A beta release requires, at minimum, closing the reward-abuse gap, agreeing
+The reward-policy increment also passed `npm run test:all`: rejection of
+unverified ad/referral claims through Gateway and direct Wallet, server-owned
+amounts and recipients, read-only claim availability, concurrent daily claims,
+restart persistence, simulated UTC reset, and the browser claim/reload flow.
+Provider integration remains unimplemented and provider rewards remain disabled.
+See [reward contracts](rewards.md).
+
+A beta release requires, at minimum, keeping unverified rewards disabled, agreeing
 eligibility/terms, securing deployment credentials/networks, assigning support
 and incident ownership, and reconciling any legacy data. A production release
 also needs backup/restore evidence, capacity targets and test results, migration

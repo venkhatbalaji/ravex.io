@@ -13,9 +13,7 @@ test("admin results and cancellation update the player's history and wallet", as
   const email = `browser-${randomUUID()}@example.test`;
   const password = "browser-test-password-123";
   expect((await request.post(`${gateway}/auth/register`, { data: { email, password, displayName: "Browser Player" } })).ok()).toBeTruthy();
-  const playerLogin = await request.post(`${gateway}/auth/login`, { data: { email, password } });
-  const playerToken = (await playerLogin.json()).accessToken;
-  await request.post(`${gateway}/wallet/me/earn`, { data: { reason: "daily_login" }, headers: { Authorization: `Bearer ${playerToken}` } });
+
   async function createMarket(title: string) {
     const response = await request.post(`${gateway}/markets`, { headers, data: { title, eventStartAt: new Date(Date.now() + 3_600_000).toISOString(), outcomes: ["Home", "Away"] } });
     expect(response.ok()).toBeTruthy(); return response.json();
@@ -39,6 +37,15 @@ test("admin results and cancellation update the player's history and wallet", as
   await playerPage.getByLabel("Password", { exact: true }).fill(password);
   await playerPage.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(playerPage.getByRole("button", { name: "Log out" })).toBeVisible();
+  await playerPage.goto(`${platform}/wallet`);
+  await expect(playerPage.getByRole("button", { name: "Watch a rewarded ad" })).toHaveCount(0);
+  await expect(playerPage.getByRole("button", { name: "Referral bonus" })).toHaveCount(0);
+  await playerPage.getByRole("button", { name: "Daily login bonus +50", exact: true }).click();
+  await expect(playerPage.getByRole("status")).toHaveText("+50 coins");
+  await expect(playerPage.getByRole("button", { name: "Daily bonus claimed +50", exact: true })).toBeDisabled();
+  await expect(playerPage.getByText(/Next daily bonus:/)).toBeVisible();
+  await playerPage.reload();
+  await expect(playerPage.getByRole("button", { name: "Daily bonus claimed +50", exact: true })).toBeDisabled();
   await playerPage.goto(`${platform}/markets/${item.id}`);
   await playerPage.getByRole("combobox", { name: "Outcome", exact: true }).selectOption(item.outcomes[0].id);
   await playerPage.getByLabel("Amount", { exact: true }).fill("10");

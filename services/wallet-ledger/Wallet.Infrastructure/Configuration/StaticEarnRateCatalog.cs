@@ -11,9 +11,7 @@ public sealed class StaticEarnRateCatalog : IEarnRateCatalog
 {
     private static readonly IReadOnlyDictionary<string, long> Rates = new Dictionary<string, long>
     {
-        ["daily_login"] = 50,
-        ["rewarded_ad"] = 20,
-        ["referral"] = 100
+        ["daily_login"] = 50
     };
 
     public bool TryGetRate(string reason, out long amount) => Rates.TryGetValue(reason, out amount);

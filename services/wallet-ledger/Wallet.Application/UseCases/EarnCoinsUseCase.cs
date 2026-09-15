@@ -28,17 +28,23 @@ public sealed class EarnCoinsUseCase : IEarnCoinsUseCase
 
     public async Task<EarnResult> ExecuteAsync(Guid userId, EarnRequest request, CancellationToken ct = default)
     {
-        if (!_rates.TryGetRate(request.Reason, out var amount))
+        // A rate is not evidence of an ad view or a successful referral.
+        // Only this explicit self-claim policy can authorize public minting.
+        if (request.Reason is "rewarded_ad" or "referral")
+            throw new RewardVerificationRequiredException();
+        if (request.Reason != "daily_login" || !_rates.TryGetRate(request.Reason, out var amount))
             throw new UnknownEarnReasonException(request.Reason, _rates.ValidReasons);
 
         await using var transaction = await _transactions.BeginAsync(userId, null, ct);
         var account = await _accounts.GetOrCreateForUserAsync(userId, ct);
 
-        if (await _ledger.HasEntryTodayAsync(account.Id, request.Reason, ct))
+        var claimedAt = DateTimeOffset.UtcNow;
+        var today = new DateTimeOffset(claimedAt.UtcDateTime.Date, TimeSpan.Zero);
+        if (await _ledger.GetLastEarnAtAsync(userId, request.Reason, ct) is { } previous && previous >= today)
             throw new AlreadyClaimedTodayException(request.Reason);
 
         var house = await _accounts.GetHouseAccountAsync(ct);
-        var (debit, credit) = LedgerTransaction.Create(house.Id, account.Id, amount, request.Reason);
+        var (debit, credit) = LedgerTransaction.Create(house.Id, account.Id, amount, request.Reason, claimedAt);
         await _ledger.AddRangeAsync(new[] { debit, credit }, ct);
 
         var balance = await _ledger.GetBalanceAsync(account.Id, ct);

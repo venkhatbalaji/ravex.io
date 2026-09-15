@@ -32,3 +32,8 @@ public sealed class InsufficientBalanceException : WalletApplicationException
     public InsufficientBalanceException(long balance, long requested)
         : base($"Balance {balance} is not enough to stake {requested}.") { }
 }
+
+public sealed class RewardVerificationRequiredException : WalletApplicationException
+{
+    public RewardVerificationRequiredException() : base("This reward requires server verification and is not available for direct claims.") { }
+}

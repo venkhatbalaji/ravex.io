@@ -1,24 +1,28 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/context/auth-context";
 import { api, ApiError } from "@/lib/api";
 import { useCountUp } from "@/components/use-count-up";
 import { useCopy } from "@/context/branding-context";
 
 export default function WalletPage() {
-  const { token } = useAuth();
+  const { token, isLoading } = useAuth();
   const queryClient = useQueryClient();
   const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isClaiming, setIsClaiming] = useState(false);
+  const claiming = useRef(false);
 
   const heading = useCopy("wallet.heading", "Wallet");
   const recentActivity = useCopy("wallet.recentActivity", "Recent activity");
-  const EARN_REASONS = [
-    { key: "daily_login", label: useCopy("wallet.earnDailyLogin", "Daily login bonus"), amount: 50 },
-    { key: "rewarded_ad", label: useCopy("wallet.earnRewardedAd", "Watch a rewarded ad"), amount: 20 },
-    { key: "referral", label: useCopy("wallet.earnReferral", "Referral bonus"), amount: 100 },
-  ];
+  const dailyLabel = useCopy("wallet.earnDailyLogin", "Daily login bonus");
+  const rewards = useQuery({
+    queryKey: ["rewards", token], queryFn: () => api.rewards(token!),
+    enabled: Boolean(token), refetchInterval: 10000, retry: false,
+  });
 
   const { data: balance } = useQuery({
     queryKey: ["balance", token],
@@ -33,16 +37,29 @@ export default function WalletPage() {
   const displayBalance = useCountUp(balance?.balance ?? 0);
 
   async function earn(reason: string) {
+    if (!token || claiming.current) return;
+    claiming.current = true;
+    setIsClaiming(true);
     setMessage(null);
+    setError(null);
     try {
-      const result = await api.earn(token!, reason);
+      const result = await api.earn(token, reason);
       setMessage(`+${result.credited} coins`);
-      queryClient.invalidateQueries({ queryKey: ["balance"] });
-      queryClient.invalidateQueries({ queryKey: ["ledger"] });
     } catch (err) {
-      setMessage(err instanceof ApiError ? err.message : "Could not claim that right now.");
+      setError(err instanceof ApiError ? err.message : "Could not confirm the claim. Check your balance and try again.");
+    } finally {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["balance", token] }),
+        queryClient.invalidateQueries({ queryKey: ["ledger", token] }),
+        queryClient.invalidateQueries({ queryKey: ["rewards", token] }),
+      ]);
+      claiming.current = false;
+      setIsClaiming(false);
     }
   }
+
+  if (isLoading) return <p className="text-sm text-muted">Loading wallet…</p>;
+  if (!token) return <p className="text-sm text-muted"><Link href="/login" className="text-accent-text underline">Log in</Link> to view your wallet and claim rewards.</p>;
 
   return (
     <div className="space-y-10">
@@ -53,18 +70,26 @@ export default function WalletPage() {
         </p>
       </div>
 
-      <div data-reveal className="flex flex-wrap gap-3">
-        {EARN_REASONS.map((r) => (
-          <button
-            key={r.key}
-            onClick={() => earn(r.key)}
-            className="glow-accent rounded-full border border-border-strong bg-surface px-4 py-2 text-xs text-fg transition hover:border-accent/40 active:scale-[0.98]"
-          >
-            {r.label} <span className="font-mono text-accent-text">+{r.amount}</span>
-          </button>
+      <div data-reveal className="space-y-3">
+        <h2 className="font-display text-lg font-medium text-fg">Available rewards</h2>
+        {rewards.isPending && <p className="text-sm text-muted">Loading rewards…</p>}
+        {rewards.error && <p role="alert" className="text-sm text-danger">Could not refresh rewards. <button onClick={() => void rewards.refetch()} className="underline">Try again</button>.</p>}
+        {rewards.data?.items.map((r) => (
+          <div key={r.reason} className="space-y-2">
+            <button
+              onClick={() => earn(r.reason)}
+              disabled={!r.available || isClaiming || Boolean(rewards.error)}
+              className="glow-accent rounded-full border border-border-strong bg-surface px-4 py-2 text-xs text-fg transition hover:border-accent/40 active:scale-[0.98] disabled:opacity-50"
+            >
+              {isClaiming ? "Claiming…" : r.available ? dailyLabel : "Daily bonus claimed"} <span className="font-mono text-accent-text">+{r.amount}</span>
+            </button>
+            {r.nextAvailableAt && <p className="text-xs text-muted">Next daily bonus: {new Date(r.nextAvailableAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST</p>}
+          </div>
         ))}
+        <p className="text-xs text-muted">Daily rewards reset at 05:30 IST (00:00 UTC). More reward options are coming soon.</p>
       </div>
-      {message && <p className="text-xs text-accent-text">{message}</p>}
+      {message && <p role="status" className="text-xs text-accent-text">{message}</p>}
+      {error && <p role="alert" className="text-xs text-danger">{error}</p>}
 
       <div data-reveal className="space-y-3">
         <h2 className="font-display text-lg font-medium text-fg">{recentActivity}</h2>
