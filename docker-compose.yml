@@ -41,6 +41,7 @@ services:
     ports:
       - "5101:8080"
     environment:
+      DOTNET_ENVIRONMENT: Development
       IDENTITY_DB_CONNECTION: "Host=postgres;Port=5432;Database=ravex;Username=ravex;Password=ravex_dev;Search Path=identity"
       JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:-dev-only-signing-key-change-me-please-32bytes!}
       # The only way an Admin account gets created — see services/README.md.
@@ -57,6 +58,7 @@ services:
     ports:
       - "5102:8080"
     environment:
+      DOTNET_ENVIRONMENT: Development
       INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:-dev-only-internal-service-key-change-me!}
       WALLET_DB_CONNECTION: "Host=postgres;Port=5432;Database=ravex;Username=ravex;Password=ravex_dev;Search Path=wallet"
       JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:-dev-only-signing-key-change-me-please-32bytes!}
@@ -71,6 +73,7 @@ services:
     ports:
       - "5103:8080"
     environment:
+      DOTNET_ENVIRONMENT: Development
       INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:-dev-only-internal-service-key-change-me!}
       SETTLEMENT_SERVICE_URL: "http://settlement-engine:8080"
       JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:-dev-only-signing-key-change-me-please-32bytes!}
@@ -84,6 +87,7 @@ services:
     ports:
       - "5201:8080"
     environment:
+      APP_ENV: Development
       WALLET_SERVICE_URL: "http://wallet-ledger:8080"
       IDENTITY_SERVICE_URL: "http://identity:8080"
       INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:-dev-only-internal-service-key-change-me!}
@@ -106,6 +110,7 @@ services:
     ports:
       - "5104:8080"
     environment:
+      DOTNET_ENVIRONMENT: Development
       BRANDING_DB_CONNECTION: "Host=postgres;Port=5432;Database=ravex;Username=ravex;Password=ravex_dev;Search Path=branding"
       JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:-dev-only-signing-key-change-me-please-32bytes!}
     depends_on:
@@ -119,6 +124,7 @@ services:
     ports:
       - "5100:8080"
     environment:
+      DOTNET_ENVIRONMENT: Development
       JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:-dev-only-signing-key-change-me-please-32bytes!}
     depends_on:
       - identity

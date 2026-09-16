@@ -9,6 +9,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
+Ravex.Configuration.ProductionConfiguration.Configure(builder, "BRANDING_DB_CONNECTION");
 
 builder.Services.AddBrandingInfrastructure(builder.Configuration);
 

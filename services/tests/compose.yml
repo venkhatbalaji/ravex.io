@@ -17,6 +17,7 @@ services:
       context: ../..
       dockerfile: services/identity/Dockerfile
     environment:
+      DOTNET_ENVIRONMENT: Development
       IDENTITY_DB_CONNECTION: "Host=postgres;Database=ravex;Username=ravex;Password=ravex_test;Search Path=identity"
       ADMIN_BOOTSTRAP_EMAIL: "admin@integration.test"
       ADMIN_BOOTSTRAP_PASSWORD: "integration-only-admin-password-123"
@@ -29,6 +30,7 @@ services:
       context: ../..
       dockerfile: services/wallet-ledger/Dockerfile
     environment:
+      DOTNET_ENVIRONMENT: Development
       WALLET_DB_CONNECTION: "Host=postgres;Database=ravex;Username=ravex;Password=ravex_test;Search Path=wallet"
       INTERNAL_SERVICE_KEY: integration-only-service-key-32-characters
     ports: ["127.0.0.1::8080"]
@@ -40,6 +42,7 @@ services:
       context: ../..
       dockerfile: services/market-catalog/Dockerfile
     environment:
+      DOTNET_ENVIRONMENT: Development
       MARKET_CATALOG_DB_CONNECTION: "Host=postgres;Database=ravex;Username=ravex;Password=ravex_test;Search Path=market_catalog"
       INTERNAL_SERVICE_KEY: integration-only-service-key-32-characters
       SETTLEMENT_SERVICE_URL: "http://settlement-engine:8080"
@@ -50,6 +53,7 @@ services:
   settlement-engine:
     build: ../settlement-engine
     environment:
+      APP_ENV: Development
       SETTLEMENT_DB_CONNECTION: "postgres://ravex:ravex_test@postgres/ravex?sslmode=disable"
       IDENTITY_SERVICE_URL: "http://identity:8080"
       WALLET_SERVICE_URL: "http://wallet-ledger:8080"
@@ -64,6 +68,7 @@ services:
       context: ../..
       dockerfile: services/branding/Dockerfile
     environment:
+      DOTNET_ENVIRONMENT: Development
       BRANDING_DB_CONNECTION: "Host=postgres;Database=ravex;Username=ravex;Password=ravex_test;Search Path=branding"
     ports: ["127.0.0.1::8080"]
     depends_on:
@@ -74,6 +79,7 @@ services:
       context: ../..
       dockerfile: services/gateway/Dockerfile
     environment:
+      DOTNET_ENVIRONMENT: Development
       RequestLimits__AuthPermits: "1000"
       RequestLimits__EarnPermits: "1000"
       RequestLimits__StakePermits: "1000"
@@ -88,6 +94,7 @@ services:
       context: ../..
       dockerfile: services/gateway/Dockerfile
     environment:
+      DOTNET_ENVIRONMENT: Development
       RequestLimits__WindowSeconds: "10"
       RequestLimits__AuthPermits: "3"
       RequestLimits__EarnPermits: "3"

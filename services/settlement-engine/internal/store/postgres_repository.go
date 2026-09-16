@@ -49,7 +49,12 @@ func (r *PostgresRepository) migrate(ctx context.Context) error {
 	if _, err = tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock(hashtextextended('settlement:migrations', 0))"); err != nil {
 		return err
 	}
-	if _, err = tx.ExecContext(ctx, `CREATE SCHEMA IF NOT EXISTS settlement;
+	if _, err = tx.ExecContext(ctx, `DO $schema$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'settlement') THEN
+                CREATE SCHEMA settlement;
+            END IF;
+        END $schema$;
         CREATE TABLE IF NOT EXISTS settlement.schema_migrations (name text PRIMARY KEY)`); err != nil {
 		return err
 	}

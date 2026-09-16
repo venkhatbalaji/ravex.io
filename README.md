@@ -51,6 +51,8 @@ npm run db:migrate     # applies pending migrations to DATABASE_URL
 
 ## Production
 
+For prediction backend deployment, see the [production configuration baseline](docs/production-deployment.md) and [enterprise readiness register](docs/enterprise-readiness.md). The default `docker-compose.yml` is for development.
+
 Set `DATABASE_URL`, `NEXT_PUBLIC_SITE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GEMINI_API_KEY` and `GEMINI_MODEL_ID` in `apps/web/.env.local`. Run `npm run db:migrate`, then `npm run build`, then `npm run start --workspace=@ravex/web`.
 
 The inquiry endpoint validates all input server-side and includes a honeypot field. The chat agent enforces a per-user daily token quota (`CHAT_DAILY_TOKEN_QUOTA`), but the `/api/auth/sign-up` and `/api/auth/sign-in` endpoints have no rate limiting yet — add infrastructure-level rate limiting across all of these before public launch.

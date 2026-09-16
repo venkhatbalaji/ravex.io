@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
+Ravex.Configuration.ProductionConfiguration.Configure(builder, "MARKET_CATALOG_DB_CONNECTION", internalKey: true);
 
 builder.Services.AddMarketCatalogInfrastructure(builder.Configuration);
 builder.Services.AddHostedService<MarketCatalog.Api.ResolutionWorker>();

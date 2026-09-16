@@ -1,4 +1,4 @@
-CREATE SCHEMA IF NOT EXISTS settlement;
+-- The migration runner ensures the schema exists before applying migrations.
 CREATE TABLE settlement.market_gates (
     market_id uuid PRIMARY KEY,
     closed boolean NOT NULL DEFAULT false

@@ -9,6 +9,7 @@ using Wallet.Infrastructure;
 using Wallet.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
+Ravex.Configuration.ProductionConfiguration.Configure(builder, "WALLET_DB_CONNECTION", internalKey: true);
 var serviceKey = builder.Configuration["INTERNAL_SERVICE_KEY"];
 if (string.IsNullOrWhiteSpace(serviceKey) || serviceKey.Length < 32)
     throw new InvalidOperationException("INTERNAL_SERVICE_KEY must contain at least 32 characters.");

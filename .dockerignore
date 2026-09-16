@@ -1,0 +1,10 @@
+.git
+.secrets
+**/node_modules
+**/.next
+**/.next-e2e
+**/bin
+**/obj
+**/.env
+**/.env.*
+**/.secrets

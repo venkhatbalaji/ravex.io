@@ -1,5 +1,6 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
+COPY services/shared/ services/shared/
 COPY services/Directory.Build.props services/Directory.Build.props
 COPY services/gateway/ services/gateway/
 WORKDIR /src/services/gateway

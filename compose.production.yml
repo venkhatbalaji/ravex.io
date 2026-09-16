@@ -1,0 +1,191 @@
+# Standalone configuration: do not combine with docker-compose.yml.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ravex
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    volumes:
+      - production_postgres:/var/lib/postgresql/data
+      - ./infra/production/init.sql:/docker-entrypoint-initdb.d/01-services.sql:ro
+    networks: [backend]
+    secrets:
+      - postgres_password
+      - identity_password
+      - wallet_password
+      - market_catalog_password
+      - settlement_password
+      - branding_password
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U postgres -d ravex"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  identity:
+    build:
+      context: .
+      dockerfile: services/identity/Dockerfile
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [backend]
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      JWT_SIGNING_KEY_FILE: /run/secrets/jwt_signing_key
+      IDENTITY_DB_CONNECTION_FILE: /run/secrets/identity_connection
+      ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_BOOTSTRAP_EMAIL:?Set ADMIN_BOOTSTRAP_EMAIL}
+      ADMIN_BOOTSTRAP_PASSWORD_FILE: /run/secrets/admin_bootstrap_password
+    secrets:
+      - jwt_signing_key
+      - identity_connection
+      - admin_bootstrap_password
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  wallet-ledger:
+    build:
+      context: .
+      dockerfile: services/wallet-ledger/Dockerfile
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [backend]
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      JWT_SIGNING_KEY_FILE: /run/secrets/jwt_signing_key
+      WALLET_DB_CONNECTION_FILE: /run/secrets/wallet_connection
+      INTERNAL_SERVICE_KEY_FILE: /run/secrets/internal_service_key
+    secrets:
+      - jwt_signing_key
+      - wallet_connection
+      - internal_service_key
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  market-catalog:
+    build:
+      context: .
+      dockerfile: services/market-catalog/Dockerfile
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [backend]
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      JWT_SIGNING_KEY_FILE: /run/secrets/jwt_signing_key
+      MARKET_CATALOG_DB_CONNECTION_FILE: /run/secrets/market_catalog_connection
+      INTERNAL_SERVICE_KEY_FILE: /run/secrets/internal_service_key
+      SETTLEMENT_SERVICE_URL: http://settlement-engine:8080
+    secrets:
+      - jwt_signing_key
+      - market_catalog_connection
+      - internal_service_key
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  settlement-engine:
+    build:
+      context: ./services/settlement-engine
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [backend]
+    environment:
+      APP_ENV: Production
+      SETTLEMENT_DB_CONNECTION_FILE: /run/secrets/settlement_connection
+      INTERNAL_SERVICE_KEY_FILE: /run/secrets/internal_service_key
+      WALLET_SERVICE_URL: http://wallet-ledger:8080
+      MARKET_CATALOG_SERVICE_URL: http://market-catalog:8080
+      IDENTITY_SERVICE_URL: http://identity:8080
+    secrets:
+      - settlement_connection
+      - internal_service_key
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  branding:
+    build:
+      context: .
+      dockerfile: services/branding/Dockerfile
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [backend]
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      JWT_SIGNING_KEY_FILE: /run/secrets/jwt_signing_key
+      BRANDING_DB_CONNECTION_FILE: /run/secrets/branding_connection
+    secrets:
+      - jwt_signing_key
+      - branding_connection
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  gateway:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [backend, edge]
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      JWT_SIGNING_KEY_FILE: /run/secrets/jwt_signing_key
+      Cors__AllowedOrigins__0: ${PLATFORM_ORIGIN:?Set PLATFORM_ORIGIN}
+      Cors__AllowedOrigins__1: ${ADMIN_ORIGIN:?Set ADMIN_ORIGIN}
+    ports:
+      - "127.0.0.1:${GATEWAY_PORT:-5100}:8080"
+    secrets:
+      - jwt_signing_key
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+networks:
+  backend:
+    internal: true
+  edge: {}
+volumes:
+  production_postgres:
+secrets:
+  postgres_password:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/postgres_password
+  jwt_signing_key:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/jwt_signing_key
+  internal_service_key:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/internal_service_key
+  admin_bootstrap_password:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/admin_bootstrap_password
+  identity_password:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/identity_password
+  identity_connection:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/identity_connection
+  wallet_password:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/wallet_password
+  wallet_connection:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/wallet_connection
+  market_catalog_password:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/market_catalog_password
+  market_catalog_connection:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/market_catalog_connection
+  settlement_password:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/settlement_password
+  settlement_connection:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/settlement_connection
+  branding_password:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/branding_password
+  branding_connection:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/branding_connection

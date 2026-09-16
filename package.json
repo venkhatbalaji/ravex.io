@@ -17,7 +17,8 @@
     "db:migrate": "npm run db:migrate --workspace=@ravex/web",
     "test:backend": "python3 services/tests/stake_lifecycle.py",
     "test:ui": "python3 services/tests/stake_lifecycle.py --ui",
-    "test:all": "npm run typecheck --workspaces --if-present && npm run test:ui"
+    "test:all": "npm run typecheck --workspaces --if-present && npm run test:ui && npm run test:production",
+    "test:production": "python3 services/tests/production_security.py"
   },
   "engines": {
     "node": ">=20"

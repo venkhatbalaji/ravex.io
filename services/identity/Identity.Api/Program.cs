@@ -12,6 +12,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
+Ravex.Configuration.ProductionConfiguration.Configure(builder, "IDENTITY_DB_CONNECTION", bootstrap: true);
 
 builder.Services.AddIdentityInfrastructure(builder.Configuration);
 

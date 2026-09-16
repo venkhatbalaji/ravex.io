@@ -5,4 +5,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="../../shared/ProductionConfiguration.cs" Link="Configuration/ProductionConfiguration.cs" />
+  </ItemGroup>
 </Project>

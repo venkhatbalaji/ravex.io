@@ -139,7 +139,14 @@ npm run dev:platform   # player app, :3001
 npm run dev:admin      # admin app, :3002 — requires an Admin account, see below
 ```
 
-Compose provides local-only credentials. Set `INTERNAL_SERVICE_KEY` to a
+Compose explicitly selects `Development` and provides local-only credentials.
+When running hosts directly for local development, set `DOTNET_ENVIRONMENT=Development`
+(.NET) or `APP_ENV=Development` (Go). Other environments require explicit secrets
+and reject development placeholders. For deployment, use the standalone
+[production configuration](../docs/production-deployment.md), including secret-file
+mounts and separate database roles.
+
+Set `INTERNAL_SERVICE_KEY` to a
 shared secret of at least 32 characters for Wallet, Catalog, and Settlement
 outside the local defaults. Settlement also accepts `SETTLEMENT_DB_CONNECTION`,
 `WALLET_SERVICE_URL`, `MARKET_CATALOG_SERVICE_URL`, and `IDENTITY_SERVICE_URL`.

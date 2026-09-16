@@ -19,9 +19,9 @@ not to infrastructure that may exist elsewhere.
 
 ## Delivery sequence
 
-1. **Operational visibility (current increment):** protected recovery backlog,
+1. **Operational visibility (implemented baseline):** protected recovery backlog,
    Catalog processing decisions, database-aware readiness, outage tests, runbook.
-2. **Security and economy controls:** verified rewards, abuse limits, session
+2. **Security and economy controls (current phase):** verified rewards, abuse limits, session
    lifecycle, privileged identity controls, production secret/network defaults.
 3. **Governance and market operations:** complete administrative audit events,
    fixtures, drafts/publication, result verification and dispute procedures.
@@ -62,9 +62,9 @@ be replaced with named owners during release planning.
 | SEC-05 | Browser token and XSS protection | Open | Review localStorage token exposure; choose cookie/BFF or other session design, CSP and CSRF controls as applicable | Security/frontend |
 | SEC-06 | Password reset and email verification | Open | Expiring one-use tokens, enumeration resistance, rate limits and mail delivery evidence | Identity |
 | SEC-07 | Login, registration, earn and stake abuse limits | Partial | Per-process gateway quotas, 429/Retry-After and spoof-resistant keys implemented; distributed/edge limits, trusted-proxy deployment, service-level controls and load tests remain | Gateway/security |
-| SEC-08 | Production secrets and signing-key rotation | Open — production blocker | Reject development credentials; secret-manager integration and tested key rotation | Platform/security |
-| SEC-09 | Service identity and network isolation | Partial | Internal key enforced; distinct service credentials, rotation, TLS/mTLS and private backend networks remain | Platform |
-| SEC-10 | Least-privilege database roles | Open — production blocker | Separate service and migration principals; prohibit cross-schema writes | Platform/backend |
+| SEC-08 | Production secrets and signing-key rotation | Partial — production blocker | Startup rejects development credentials; secret-file loading implemented; secret-manager integration and tested key rotation remain | Platform/security |
+| SEC-09 | Service identity and network isolation | Partial | Internal key enforced and private production backend network implemented; distinct service credentials, rotation and TLS/mTLS remain | Platform |
+| SEC-10 | Least-privilege database roles | Partial — production blocker | Production service roles confined to their schemas; separate runtime and migration principals remain | Platform/backend |
 | SEC-11 | Input, payload and resource limits | Partial | Stake and backlog parameters bounded; review all APIs, uploads, bulk writes and timeouts | Backend/security |
 | SEC-12 | Vulnerability and supply-chain controls | Open | Dependency/container scans, remediation SLA, SBOM, pinned artifacts and secret scanning | Platform/security |
 | SEC-13 | Threat model and independent security review | Open | Abuse cases, attack surface, penetration test and tracked remediation | Security |
@@ -147,3 +147,5 @@ and rollback drills, security review, and signed-off operational objectives.
 Shared SaaS additionally requires tenant isolation tests across every service
 and background job. None of these gates should be inferred from a green unit
 or browser test suite alone.
+
+Production configuration and deployment limitations: [deployment baseline](production-deployment.md).

@@ -10,4 +10,7 @@
     <ProjectReference Include="..\Branding.Infrastructure\Branding.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="../../shared/ProductionConfiguration.cs" Link="Configuration/ProductionConfiguration.cs" />
+  </ItemGroup>
 </Project>

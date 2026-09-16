@@ -207,3 +207,12 @@ The test runner builds an isolated Compose project, exercises real services
 and PostgreSQL, and tears down its own containers. It includes Go handler,
 cutoff, persistence, concurrent admission, and recovery tests. The existing
 development stack is not restarted by these checks.
+
+## Production configuration baseline
+
+Non-development API startup now requires explicit secrets, with mounted secret-file
+support. A standalone production Compose configuration keeps backend ports private
+and initializes separate PostgreSQL roles confined to service schemas. Its disposable
+smoke test is included in `npm run test:all`. See [deployment instructions and
+remaining limitations](production-deployment.md); this does not complete the
+enterprise readiness register.
