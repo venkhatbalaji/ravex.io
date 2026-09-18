@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { MarketPagination } from "@/components/market-filters";
 import { RequireAdmin } from "@/components/require-admin";
 import { useAuth } from "@/context/auth-context";
 import { api } from "@/lib/api";
@@ -13,13 +14,15 @@ export default function OperationsPage() {
 
 function OperationsContent() {
   const { token } = useAuth();
+  const [marketOffset, setMarketOffset] = useState(0);
   const [offset, setOffset] = useState(0);
   const backlog = useQuery({
     queryKey: ["operations", token, offset], queryFn: () => api.operations(token!, offset),
     enabled: Boolean(token), refetchInterval: 5000, retry: false,
   });
-  const markets = useQuery({ queryKey: ["markets"], queryFn: () => api.markets(), refetchInterval: 5000 });
-  const pendingMarkets = markets.data?.filter(m => m.status === "settling" || m.status === "refunding");
+  const markets = useQuery({ queryKey: ["markets", "processing", marketOffset],
+    queryFn: () => api.markets({ phase: "processing", offset: marketOffset }), refetchInterval: 5000, retry: false });
+  const pendingMarkets = markets.data?.items;
   const snapshot = backlog.data;
   const oldestAge = snapshot?.oldestPendingAt
     ? Math.max(0, Math.floor((Date.parse(snapshot.observedAt) - Date.parse(snapshot.oldestPendingAt)) / 1000)) : null;
@@ -66,13 +69,15 @@ function OperationsContent() {
       <p className="text-xs text-muted">Catalog decisions can appear here before Settlement creates a payout plan. <Link href="/markets" className="text-accent underline">Manage markets</Link>.</p>
       {markets.error && <p role="alert" className="text-sm text-danger">Cannot refresh market decisions. Displayed results may be stale.</p>}
       {markets.isPending && <p className="text-sm text-muted">Loading recorded results…</p>}
-      {pendingMarkets?.length === 0 && <p className="text-sm text-muted">No results awaiting completion.</p>}
+      {pendingMarkets?.length === 0 && !markets.error && <p className="text-sm text-muted">{marketOffset === 0 ? "No results awaiting completion." : "No results on this page. Return to the previous page."}</p>}
       <div className="space-y-3">{pendingMarkets?.map(m => <article key={m.id} className="rounded-lg border border-border p-4">
         <h3 className="font-semibold text-fg">{m.title}</h3>
         <p className="text-sm text-muted">{m.status} · {m.resolutionRequestedAt ? formatTime(m.resolutionRequestedAt) + " IST" : "Request time unavailable"}</p>
         <p className="mt-1 text-xs text-muted">{m.resultSource}</p>
         <p className="mt-1 font-mono text-xs text-muted">{m.id}</p>
       </article>)}</div>
+      <MarketPagination label="Result pages" offset={marketOffset} nextOffset={markets.data?.nextOffset ?? null}
+        busy={markets.isFetching} onChange={setMarketOffset} />
     </section>
   );
 }

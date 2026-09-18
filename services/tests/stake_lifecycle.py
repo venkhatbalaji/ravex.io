@@ -2,6 +2,7 @@
 """Run with Python 3; creates and removes its own isolated Compose project.
 Use --project NAME to exercise an already-running test project without cleanup.
 """
+from discovery_features import verify_discovery
 from product_features import verify_product_features
 from operations_features import verify_operations
 from reward_features import verify_rewards
@@ -218,6 +219,8 @@ def main():
         verify_rewards(call, expect, command, sql, endpoint, admin_token, player)
 
         verify_operations(call, expect, eventually, command, endpoint, sql, admin_token, player)
+
+        verify_discovery(call, expect, eventually, command, sql, endpoint, admin_token)
 
         if not args.project:
             command("exec", "-T", "postgres", "createdb", "-U", "ravex", "settlement_tests")

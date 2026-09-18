@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/auth-context";
 import { api, ApiError, type Market } from "@/lib/api";
+import { MarketFilterControls, MarketPagination, initialMarketFilters } from "@/components/market-filters";
 import { RequireAdmin } from "@/components/require-admin";
 
 const STATUS_STYLE: Record<Market["status"], string> = {
@@ -29,8 +30,11 @@ export default function MarketsPage() {
 function MarketsContent() {
   const { token } = useAuth();
   const queryClient = useQueryClient();
-  const { data: markets, isLoading } = useQuery({ queryKey: ["markets"], queryFn: () => api.markets(), refetchInterval: 3000 });
-  const { data: categories } = useQuery({ queryKey: ["categories"], queryFn: () => api.categories() });
+  const [filters, setFilters] = useState(initialMarketFilters);
+  const { data: markets, isLoading, error: listError, isFetching, refetch } = useQuery({
+    queryKey: ["markets", filters], queryFn: () => api.markets(filters), refetchInterval: 3000, retry: false,
+  });
+  const { data: categories, error: categoriesError } = useQuery({ queryKey: ["categories"], queryFn: () => api.categories() });
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,12 +70,16 @@ function MarketsContent() {
           categories={categories ?? []}
           onCreated={() => {
             setShowForm(false);
+            setFilters({ ...initialMarketFilters });
             queryClient.invalidateQueries({ queryKey: ["markets"] });
           }}
         />
       )}
 
-      {error && <p className="text-sm text-danger">{error}</p>}
+      <MarketFilterControls key={filters.search} filters={filters} onChange={setFilters} categories={categories ?? []} admin />
+      {categoriesError && <p role="alert" className="text-sm text-danger">Categories are unavailable. Try refreshing the page.</p>}
+      {listError && <p role="alert" className="text-sm text-danger">Cannot load markets. Any displayed results may be stale. <button onClick={() => void refetch()} className="underline">Try again</button></p>}
+      {error && <p role="alert" className="text-sm text-danger">{error}</p>}
       {isLoading && <p className="text-sm text-muted">Loading…</p>}
 
       <div className="overflow-x-auto rounded-lg border border-border">
@@ -86,11 +94,11 @@ function MarketsContent() {
             </tr>
           </thead>
           <tbody>
-            {markets?.map((market) => (
+            {markets?.items.map((market) => (
               <tr key={market.id} className="border-b border-border last:border-0">
                 <td className="px-4 py-3 text-fg">{market.title}</td>
                 <td className="px-4 py-3 text-muted">{categoryName(market.categoryId)}</td>
-                <td className="px-4 py-3 text-muted">{new Date(market.eventStartAt).toLocaleString()}</td>
+                <td className="px-4 py-3 text-muted">{new Date(market.eventStartAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST</td>
                 <td className="px-4 py-3">
                   <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[market.status]}`}>
                     {market.status}
@@ -119,8 +127,10 @@ function MarketsContent() {
             ))}
           </tbody>
         </table>
-        {markets?.length === 0 && !isLoading && <p className="p-4 text-sm text-muted">No markets yet.</p>}
+        {markets?.items.length === 0 && !isLoading && !listError && <p className="p-4 text-sm text-muted">No markets on this page. Clear the filters or return to the previous page.</p>}
       </div>
+      <MarketPagination offset={filters.offset} nextOffset={markets?.nextOffset ?? null} busy={isFetching}
+        onChange={offset => setFilters({ ...filters, offset })} />
     </div>
   );
 }

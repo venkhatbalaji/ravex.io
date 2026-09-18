@@ -17,7 +17,7 @@ gates, ownership, acceptance criteria and remaining gaps.
 | Catalog | Create, list, lock, resolve/cancel markets; categories; admin-only writes; immutable result evidence and actor | Fixtures, broader administrative audit trail |
 | Settlement | Durable stakes and payout plans, admission gates, debit/payout recovery, exact integer allocation, admin-only previews and backlog snapshots | Production metrics and paging alerts |
 | Branding | Theme (brand name, logo URLs, two accent colors, one of four fonts) and a copy-override dictionary, both admin-only to write, public to read; `apps/platform` applies both at runtime | Logo upload/object storage (URLs only), true multi-tenant multi-brand hosting |
-| Platform | Login, registration, markets, stake form, wallet, private prediction history, dynamic branding/copy | Rankings |
+| Platform | Login, registration, markets, stake form, wallet, private prediction history, paginated discovery, category/phase/search filters, IST times and cutoff controls, dynamic branding/copy | Rankings |
 | Admin | `apps/admin` — markets (create/lock/resolve/cancel), categories, branding, operational backlog, admin-only login | Fixtures, audit trail viewer |
 | Infrastructure | Compose backend, PostgreSQL, Redis, NATS, gateway, isolated integration/browser tests, CI workflow and database readiness | Production monitoring, alerting and deployment probes |
 
@@ -99,8 +99,8 @@ predictions at `/predictions`.
 
 See [settlement contracts and testing](settlement-and-testing.md) for the
 allocation policy, recovery behavior, tests, and upgrade limitations. Dedicated
-tie rules, fixtures, and an operational retry/backlog dashboard remain future
-work; a tie can use a predefined outcome or an explicit cancellation policy.
+tie rules and fixtures remain future work. The operational backlog dashboard is
+now implemented. A tie can use a predefined outcome or an explicit cancellation policy.
 
 ### Fourth increment: operational visibility (implemented)
 
@@ -132,6 +132,18 @@ user identity, and throttled prediction retries retain their original key.
 See [request-limit contracts](request-limits.md). Counters are per process;
 distributed enforcement and production proxy trust remain open requirements.
 
+### Seventh increment: market discovery and cutoff controls (implemented)
+
+Player and Admin lists now use bounded server-side search, category and phase
+filters; Admin also filters exact status. Operations paginates processing
+markets independently. Market cards/details show IST times and explain pool
+percentages. New stake controls close at cutoff while uncertain submissions
+remain retryable with their original key.
+
+See [discovery contracts and compatibility notes](market-discovery.md), including
+the new cap on the legacy catalog list and the distinction between live events
+and events awaiting a result.
+
 ## 2. Make market operations usable
 
 Admin authorization and the separate `apps/admin` application are implemented.
@@ -156,12 +168,12 @@ complete the entire market lifecycle through the gateway with an audit trail.
 
 - Implemented: `/predictions` with private, paginated pending, won, lost, and
   refunded entries, stake details, and confirmed payout.
-- Improve discovery with upcoming/live/completed filters, category selection,
-  pagination, and useful empty states.
-- Show match times clearly in IST and enforce cutoffs on the server. Disable
-  the stake form at cutoff and refresh market/pool/balance data after actions.
-- Explain that pool proportions can change before closing; the current
-  implied-odds display is not a guaranteed payout quote.
+- Implemented: server-side search, upcoming/live/processing/completed filters,
+  category selection, pagination, and empty/error states in player and Admin lists.
+- Implemented: IST market times, server-enforced cutoffs, disabled new stakes
+  at cutoff, and market/pool/balance/history refresh after submission attempts.
+- Implemented: pool copy explains that proportions can change before closing
+  and do not guarantee a payout.
 - Add rankings only after the accepted-stake and settlement data is reliable.
   Define scoring, minimum participation, ties, and season boundaries first.
 

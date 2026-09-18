@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { MarketFilterControls, MarketPagination, initialMarketFilters } from "@/components/market-filters";
 import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import Link from "next/link";
@@ -10,9 +12,12 @@ import { HeroReveal } from "@/components/hero-reveal";
 import { useCopy } from "@/context/branding-context";
 
 export default function MarketsPage() {
-  const { data: markets, isLoading } = useQuery({
-    queryKey: ["markets"],
-    queryFn: () => api.markets(),
+  const [filters, setFilters] = useState(initialMarketFilters);
+  const categories = useQuery({ queryKey: ["categories"], queryFn: api.categories });
+  const { data: markets, isLoading, error, isFetching, refetch } = useQuery({
+    queryKey: ["markets", filters],
+    queryFn: () => api.markets(filters),
+    retry: false,
     refetchInterval: 8000,
   });
 
@@ -65,19 +70,25 @@ export default function MarketsPage() {
         {marketsHeading}
       </h2>
 
+      <MarketFilterControls key={filters.search} filters={filters} onChange={setFilters} categories={categories.data ?? []} />
+      {categories.error && <p role="alert" className="text-sm text-danger">Categories are unavailable. Try refreshing the page.</p>}
+      {error && <p role="alert" className="text-sm text-danger">Cannot load markets. Any displayed results may be stale. <button onClick={() => void refetch()} className="underline">Try again</button></p>}
+      <p className="text-xs text-muted">Live includes started events awaiting a result. Pool percentages can change before closing and do not guarantee a payout.</p>
       {isLoading && <p className="text-sm text-muted">Loading markets…</p>}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {markets?.map((market, i) => (
+        {markets?.items.map((market, i) => (
           <MarketCard key={market.id} market={market} index={i} />
         ))}
       </div>
 
-      {markets?.length === 0 && !isLoading && (
+      {markets?.items.length === 0 && !isLoading && !error && (
         <p data-reveal className="text-sm text-muted">
-          {emptyState}
+          {filters.search || filters.categoryId || filters.phase ? "No markets match these filters. Try clearing them." : filters.offset > 0 ? "No markets on this page. Return to the previous page." : emptyState}
         </p>
       )}
+      <MarketPagination offset={filters.offset} nextOffset={markets?.nextOffset ?? null} busy={isFetching}
+        onChange={offset => setFilters({ ...filters, offset })} />
     </div>
   );
 }
@@ -86,8 +97,7 @@ function MarketCard({ market, index }: { market: Market; index: number }) {
   const { data: pool } = useQuery({
     queryKey: ["pool", market.id],
     queryFn: () => api.pool(market.id),
-    refetchInterval: 6000,
-    enabled: market.status !== "settled",
+    refetchInterval: market.status === "settled" || market.status === "cancelled" ? false : 6000,
   });
 
   return (
@@ -100,7 +110,7 @@ function MarketCard({ market, index }: { market: Market; index: number }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="font-display text-lg font-medium text-fg">{market.title}</h3>
-          <p className="mt-1 text-xs text-muted">{new Date(market.eventStartAt).toLocaleString()}</p>
+          <p className="mt-1 text-xs text-muted">{new Date(market.eventStartAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST</p>
         </div>
         <StatusBadge status={market.status} />
       </div>

@@ -54,6 +54,8 @@ test("admin results and cancellation update the player's history and wallet", as
   await playerPage.getByRole("link", { name: "My predictions", exact: true }).click();
   const card = playerPage.locator("article").filter({ hasText: title });
   await expect(card).toContainText("Awaiting result");
+  await adminPage.getByLabel("Search markets", { exact: true }).fill(title);
+  await adminPage.getByRole("button", { name: "Search", exact: true }).click();
   const row = adminPage.getByRole("row").filter({ hasText: title });
   await row.getByRole("button", { name: "Lock", exact: true }).click();
   await row.getByLabel(`Resolution for ${title}`).selectOption(item.outcomes[0].id);
@@ -73,6 +75,8 @@ test("admin results and cancellation update the player's history and wallet", as
   await expect(playerPage.getByRole("status")).toContainText("Staked 7 coins");
   await adminPage.reload();
   await expect(adminPage.getByRole("heading", { name: "Markets", exact: true })).toBeVisible();
+  await adminPage.getByLabel("Search markets", { exact: true }).fill(cancelTitle);
+  await adminPage.getByRole("button", { name: "Search", exact: true }).click();
   const cancelledRow = adminPage.getByRole("row").filter({ hasText: cancelTitle });
   await cancelledRow.getByLabel(`Evidence for ${cancelTitle}`).fill("Rain abandonment");
   await cancelledRow.getByRole("button", { name: "Cancel and refund", exact: true }).click();

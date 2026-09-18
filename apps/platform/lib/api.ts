@@ -29,6 +29,20 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
   return (await res.json()) as T;
 }
 
+export interface MarketFilters {
+  search: string;
+  categoryId: string;
+  status: string;
+  phase: string;
+  offset: number;
+}
+
+export interface MarketPage {
+  items: Market[];
+  nextOffset: number | null;
+  observedAt: string;
+}
+
 export interface Outcome {
   id: string;
   label: string;
@@ -131,7 +145,14 @@ export const api = {
       token,
     ),
 
-  markets: (status?: string) => request<Market[]>(`/markets${status ? `?status=${status}` : ""}`),
+  markets: (filters: Partial<MarketFilters> = {}) => {
+    const params = new URLSearchParams({ limit: "20", offset: String(filters.offset ?? 0) });
+    for (const key of ["search", "categoryId", "status", "phase"] as const) {
+      if (filters[key]) params.set(key, filters[key]);
+    }
+    return request<MarketPage>(`/markets/browse?${params}`);
+  },
+  categories: () => request<{ id: string; name: string }[]>("/categories"),
   market: (id: string) => request<Market>(`/markets/${id}`),
 
   pool: (marketId: string) => request<PoolSnapshot>(`/pools/${marketId}`),

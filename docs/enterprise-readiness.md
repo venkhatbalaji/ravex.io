@@ -47,7 +47,7 @@ be replaced with named owners during release planning.
 | PROD-07 | Ties, voids, abandonment and disputes | Partial | Cancellation exists; publish explicit per-market rules and a dispute process | Product |
 | PROD-08 | Verified rewarded-ad/referral events | Partial — direct-claim abuse closed | Wallet rejects unverified ad/referral claims; provider rewards remain disabled until signed, replay-protected events and anti-fraud rules exist | Wallet/security |
 | PROD-09 | Reconciliation and discrepancy handling | Partial | Test suite reconciles ledger and escrow; scheduled production checks, alerting and investigation workflow remain | Wallet/operations |
-| PROD-10 | Search, category/status filtering and bounded lists | Partial | History/backlog paginated; catalog/admin market lists remain unbounded | Frontend/catalog |
+| PROD-10 | Search, category/status filtering and bounded lists | Implemented | Catalog/player/Admin filtering and pagination, bounded legacy list, empty/error states; [contracts and regression coverage](market-discovery.md) | Frontend/catalog |
 | PROD-11 | Rankings and notifications | Open | Versioned scoring/season/tie rules; opt-in channels and idempotent delivery | Product |
 | PROD-12 | Historical data upgrade | Open — existing-data blocker | Reconcile old in-memory pools and legacy settled records; no automatic repayment | Operations/wallet |
 
@@ -138,6 +138,14 @@ including quotas, forwarded-header spoof resistance, user isolation, retry
 headers, reset behavior, and the existing backend/Chromium regressions.
 The pushed reward commit `4892bfa` also passed GitHub workflow `34932079656`.
 See [request limits](request-limits.md) for the per-process and proxy boundaries.
+
+On 2026-09-18, the market-discovery increment passed all workspace typechecks,
+`npm run test:ui` (backend/PostgreSQL, Go tests/vet and all three Chromium journeys),
+and `npm run test:production`. Coverage includes catalog bounds and combined
+filters, processing decisions beyond the first page, browser pagination and
+error recovery, and same-key retry after a lost response and market closure.
+See [market discovery](market-discovery.md) for the legacy-list cap and remaining
+capacity/clock limitations.
 
 A beta release requires, at minimum, keeping unverified rewards disabled, agreeing
 eligibility/terms, securing deployment credentials/networks, assigning support

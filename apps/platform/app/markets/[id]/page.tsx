@@ -49,10 +49,17 @@ export default function MarketDetailPage() {
     }
   }, [attemptStorageKey]);
 
-  const { data: market } = useQuery({
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const { data: market, error: marketError, refetch: refreshMarket } = useQuery({
     queryKey: ["market", id],
     queryFn: () => api.market(id),
     enabled: Boolean(id),
+    refetchInterval: 5000,
+    retry: false,
   });
   const { data: pool } = useQuery({
     queryKey: ["pool", id],
@@ -61,7 +68,10 @@ export default function MarketDetailPage() {
     refetchInterval: 5000,
   });
 
+  if (!market && marketError) return <p role="alert" className="text-sm text-danger">Could not load this market. <button onClick={() => void refreshMarket()} className="underline">Try again</button></p>;
   if (!market) return <p className="text-sm text-muted">Loading market…</p>;
+
+  const admissionClosed = market.status !== "open" || Date.parse(market.eventStartAt) <= now;
 
   async function stake(e: FormEvent) {
     e.preventDefault();
@@ -70,6 +80,12 @@ export default function MarketDetailPage() {
     setMessage(null);
     if (!token || !attemptStorageKey) {
       setError("Log in to place a stake.");
+      return;
+    }
+    // A previously admitted request must remain retryable even after cutoff.
+    if (!pendingAttempt && (marketError || market!.status !== "open" || Date.parse(market!.eventStartAt) <= Date.now())) {
+      setError("This market is closed to new predictions or could not be refreshed.");
+      void refreshMarket();
       return;
     }
     const attempt = pendingAttempt ?? { key: crypto.randomUUID(), outcomeId, amount };
@@ -91,8 +107,6 @@ export default function MarketDetailPage() {
         setPendingAttempt(null);
         setMessage(`Staked ${attempt.amount} coins on ${market!.outcomes.find((o) => o.id === attempt.outcomeId)?.label}.`);
       }
-      queryClient.invalidateQueries({ queryKey: ["pool", id] });
-      queryClient.invalidateQueries({ queryKey: ["balance"] });
     } catch (err) {
       // Auth expiry and transport/server failures can occur after admission.
       // Keep the original request for a later authenticated retry.
@@ -102,6 +116,11 @@ export default function MarketDetailPage() {
       }
       setError(err instanceof ApiError ? err.message : "Could not confirm your prediction. Check the same request again.");
     } finally {
+      void queryClient.invalidateQueries({ queryKey: ["market", id] });
+      void queryClient.invalidateQueries({ queryKey: ["markets"] });
+      void queryClient.invalidateQueries({ queryKey: ["pool", id] });
+      void queryClient.invalidateQueries({ queryKey: ["balance"] });
+      void queryClient.invalidateQueries({ queryKey: ["predictions"] });
       submitting.current = false;
       setIsSubmitting(false);
     }
@@ -114,11 +133,15 @@ export default function MarketDetailPage() {
           <h1 className="font-display text-3xl font-semibold text-fg">{market.title}</h1>
           <StatusBadge status={market.status} />
         </div>
-        <p className="text-xs text-muted">{new Date(market.eventStartAt).toLocaleString()}</p>
+        <p className="text-xs text-muted">{new Date(market.eventStartAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST</p>
+        {market.description && <p className="text-sm text-muted">{market.description}</p>}
         <OddsBar outcomes={market.outcomes} odds={pool?.impliedOdds} winningOutcomeId={market.winningOutcomeId} />
         <p className="font-mono text-xs tabular-nums text-muted">{pool?.totalPool ?? 0} coins in the pool</p>
       </div>
 
+      <p className="text-xs text-muted">Pool percentages show the current share of coins on each outcome. They can change before closing and do not guarantee a payout. Coins have no cash value.</p>
+      {marketError && <p role="alert" className="text-sm text-danger">Cannot refresh this market. Displayed details may be stale.</p>}
+      {admissionClosed && <p className="text-sm text-muted">This market is closed to new predictions.</p>}
       {(market.status === "open" || pendingAttempt) && (
         <form
           onSubmit={stake}
@@ -130,7 +153,7 @@ export default function MarketDetailPage() {
           <label className="block space-y-1.5 text-xs text-muted">
             <span className="uppercase tracking-wider">Outcome</span>
             <select
-              disabled={isSubmitting || Boolean(pendingAttempt)}
+              disabled={isSubmitting || Boolean(pendingAttempt) || admissionClosed || Boolean(marketError)}
               value={outcomeId}
               onChange={(e) => setOutcomeId(e.target.value)}
               required
@@ -152,7 +175,7 @@ export default function MarketDetailPage() {
               type="number"
               min={1}
               step={1}
-              disabled={isSubmitting || Boolean(pendingAttempt)}
+              disabled={isSubmitting || Boolean(pendingAttempt) || admissionClosed || Boolean(marketError)}
               value={amount}
               onChange={(e) => setAmount(Number(e.target.value))}
               required
@@ -161,10 +184,10 @@ export default function MarketDetailPage() {
           </label>
           <button
             type="submit"
-            disabled={isSubmitting || !isAuthenticated}
+            disabled={isSubmitting || !isAuthenticated || (!pendingAttempt && (admissionClosed || Boolean(marketError)))}
             className="glow-accent w-full rounded-full bg-accent px-5 py-2.5 text-xs font-semibold text-accent-fg transition hover:opacity-90 active:scale-[0.98]"
           >
-            {isSubmitting ? "Checking…" : pendingAttempt ? "Check prediction" : stakeButtonLabel}
+            {isSubmitting ? "Checking…" : pendingAttempt ? "Check prediction" : admissionClosed ? "Predictions closed" : stakeButtonLabel}
           </button>
         </form>
       )}

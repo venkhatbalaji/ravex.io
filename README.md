@@ -19,7 +19,8 @@ To sign up and use the chat agent locally, also set `GEMINI_API_KEY` and `BETTER
 ## Workspace layout
 
 For the product implementation sequence and acceptance criteria, see the
-[prediction product roadmap](docs/prediction-roadmap.md).
+[prediction product roadmap](docs/prediction-roadmap.md). Market search, filters,
+pagination and cutoff behavior are described in the [discovery contract](docs/market-discovery.md).
 
 - `apps/web` — Next.js marketing site, inquiry API, and the authenticated chat agent
 - `apps/platform` — the prediction-market product itself: Next.js + Tailwind, talks only to the gateway at `:5100`, reads its theme/copy from `branding` at runtime — see below

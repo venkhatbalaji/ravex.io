@@ -5,6 +5,7 @@ namespace MarketCatalog.Application.Contracts;
 public record CreateMarketRequest(string Title, string? Description, DateTimeOffset EventStartAt, List<string> Outcomes, Guid? CategoryId = null);
 public record SettleMarketRequest(Guid WinningOutcomeId, string Source);
 public record CancelMarketRequest(string Reason);
+public record MarketPageDto(IReadOnlyList<MarketDto> Items, int? NextOffset, DateTimeOffset ObservedAt);
 
 public record OutcomeDto(Guid Id, string Label)
 {
