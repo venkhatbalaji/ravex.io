@@ -7,7 +7,10 @@ import (
 	"strings"
 )
 
-type Settings struct{ Key, Database, Wallet, Catalog, Identity string }
+type Settings struct {
+	Key, Database, Wallet, Catalog, Identity, Mode string
+	Development                                    bool
+}
 
 func secret(key string) (string, error) {
 	value, file := os.Getenv(key), os.Getenv(key+"_FILE")
@@ -30,16 +33,32 @@ func strong(value string) bool {
 func Load() (Settings, error) {
 	var s Settings
 	var err error
-	if s.Key, err = secret("INTERNAL_SERVICE_KEY"); err != nil {
-		return s, err
+	s.Development = strings.EqualFold(os.Getenv("APP_ENV"), "Development")
+	s.Mode = os.Getenv("DATABASE_MODE")
+	if s.Mode == "" {
+		s.Mode = "runtime"
+		if s.Development {
+			s.Mode = "auto"
+		}
+	}
+	if s.Mode != "runtime" && s.Mode != "migrate" && s.Mode != "auto" {
+		return s, fmt.Errorf("DATABASE_MODE must be runtime, migrate, or auto")
+	}
+	if s.Mode == "auto" && !s.Development {
+		return s, fmt.Errorf("DATABASE_MODE auto is allowed only in Development")
+	}
+	if s.Mode != "migrate" {
+		if s.Key, err = secret("INTERNAL_SERVICE_KEY"); err != nil {
+			return s, err
+		}
+		if len(s.Key) < 32 || (!s.Development && !strong(s.Key)) {
+			return s, fmt.Errorf("INTERNAL_SERVICE_KEY requires a non-development secret of at least 32 bytes")
+		}
 	}
 	if s.Database, err = secret("SETTLEMENT_DB_CONNECTION"); err != nil {
 		return s, err
 	}
-	dev := strings.EqualFold(os.Getenv("APP_ENV"), "Development")
-	if len(s.Key) < 32 || (!dev && !strong(s.Key)) {
-		return s, fmt.Errorf("INTERNAL_SERVICE_KEY requires a non-development secret of at least 32 bytes")
-	}
+	dev := s.Development
 	if dev && s.Database == "" {
 		s.Database = "postgres://ravex:ravex_dev@localhost:5432/ravex?sslmode=disable"
 	}
@@ -55,6 +74,9 @@ func Load() (Settings, error) {
 		if len(u.Query()["password"]) > 0 || len(u.Query()["user"]) > 0 {
 			return s, fmt.Errorf("SETTLEMENT_DB_CONNECTION credentials must be in the URL authority")
 		}
+	}
+	if s.Mode == "migrate" {
+		return s, nil
 	}
 	for _, target := range []struct {
 		key, fallback string

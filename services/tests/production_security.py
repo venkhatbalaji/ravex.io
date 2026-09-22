@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise the standalone production stack with disposable secrets and storage."""
 import json
+from migration_security import verify_migration_config, verify_unmigrated_startup, verify_migration_permissions, verify_failed_migration_gate
 from datetime import datetime, timedelta, timezone
 import os
 from pathlib import Path
@@ -22,8 +23,9 @@ def main():
         assert all(p.stat().st_mode & 0o777 == 0o444 for p in directory.iterdir())
         env = dict(os.environ, RAVEX_SECRETS_DIR=str(directory), ADMIN_BOOTSTRAP_EMAIL='admin@example.com', PLATFORM_ORIGIN='https://play.example.com', ADMIN_ORIGIN='https://admin.example.com', GATEWAY_PORT='0')
         base = ['docker', 'compose', '-p', 'ravex-production-test-' + uuid.uuid4().hex[:10], '-f', 'compose.production.yml']
-        def run(*args, check=True):
-            result = subprocess.run(base + list(args), cwd=ROOT, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=600)
+        def run(*args, check=True, timeout=600, files=()):
+            extra_files = [item for path in files for item in ("-f", str(path))]
+            result = subprocess.run(base + extra_files + list(args), cwd=ROOT, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout)
             if check and result.returncode:
                 output = result.stdout
                 for secret in directory.iterdir():
@@ -35,8 +37,12 @@ def main():
         for name, service in config['services'].items():
             if name != 'gateway': assert not service.get('ports'), name
             else: assert service['ports'][0]['host_ip'] == '127.0.0.1'
+        verify_migration_config(config)
         try:
-            run('up', '-d', '--build')
+            run('build')
+            run('up', '-d', '--wait', 'postgres')
+            verify_unmigrated_startup(run)
+            run('up', '-d')
             address = run('port', 'gateway', '8080').stdout.strip()
             for attempt in range(90):
                 try:
@@ -53,17 +59,22 @@ def main():
             with urllib.request.urlopen(request, timeout=10) as response:
                 assert response.status == 200
                 token = json.load(response)['accessToken']
-            def api(path, body=None, headers=None):
+            def api(path, body=None, headers=None, method=None):
                 request = urllib.request.Request('http://' + address + path,
                     data=None if body is None else json.dumps(body).encode(),
-                    headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token, **(headers or {})})
+                    headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token, **(headers or {})}, method=method)
                 with urllib.request.urlopen(request, timeout=15) as response:
                     return json.load(response)
+            api('/auth/register', {'email': 'runtime@example.com', 'password': 'runtime-registration-password-123', 'displayName': 'Runtime Player'})
+            category = api('/categories', {'name': 'Runtime category'})
+            theme = api('/branding/theme')
+            theme['brandName'] = 'Runtime brand'
+            assert api('/branding/theme', theme, method='PUT')['brandName'] == 'Runtime brand'
             api('/wallet/me/earn', {'reason': 'daily_login'})
             assert api('/wallet/me/balance')['balance'] == 50
             market = api('/markets', {'title': 'Production configuration smoke test',
                 'eventStartAt': (datetime.now(timezone.utc) + timedelta(days=1)).isoformat(),
-                'outcomes': ['Home', 'Away']})
+                'outcomes': ['Home', 'Away'], 'categoryId': category['id']})
             stake = api(f"/pools/{market['id']}/stakes", {'outcomeId': market['outcomes'][0]['id'], 'amount': 10},
                 {'Idempotency-Key': str(uuid.uuid4())})
             assert stake['stake']['state'] == 'accepted'
@@ -75,14 +86,15 @@ def main():
             else: raise AssertionError('Production refund did not complete')
             api('/operations/settlement')
             api('/branding/theme')
-            for role in ['identity', 'wallet', 'market_catalog', 'settlement', 'branding']:
-                sql = f"SELECT rolsuper OR rolcreatedb OR rolcreaterole FROM pg_roles WHERE rolname='ravex_{role}'"
-                assert run('exec', '-T', 'postgres', 'psql', '-U', 'postgres', '-d', 'ravex', '-Atc', sql).stdout.strip() == 'f'
-                other = 'wallet' if role == 'identity' else 'identity'
-                sql = f"SET ROLE ravex_{role}; CREATE TABLE {other}.forbidden_probe(id integer);"
-                assert run('exec', '-T', 'postgres', 'psql', '-U', 'postgres', '-d', 'ravex', '-v', 'ON_ERROR_STOP=1', '-c', sql, check=False).returncode != 0
-                sql = f"SELECT has_schema_privilege('ravex_{role}', '{other}', 'USAGE')"
-                assert run('exec', '-T', 'postgres', 'psql', '-U', 'postgres', '-d', 'ravex', '-Atc', sql).stdout.strip() == 'f'
+            verify_migration_permissions(run, directory)
+            verify_failed_migration_gate(run, Path(temporary))
+            run('restart', 'identity', 'wallet-ledger', 'market-catalog', 'settlement-engine', 'branding')
+            for attempt in range(30):
+                try:
+                    if api('/wallet/me/balance')['balance'] == 50 and api('/branding/theme')['brandName'] == 'Runtime brand': break
+                except Exception: pass
+                time.sleep(1)
+            else: raise AssertionError('Runtime restart lost data or failed readiness')
             for service, key in [(name, 'JWT_SIGNING_KEY') for name in ['gateway', 'identity', 'wallet-ledger', 'market-catalog', 'branding']] + [('settlement-engine','INTERNAL_SERVICE_KEY')]:
                 result = run('run', '--rm', '--no-deps', '-e', key + '_FILE=', '-e', key + '=dev-only-signing-key-change-me-please-32bytes!', service, check=False)
                 assert result.returncode != 0 and key in result.stdout
@@ -94,7 +106,7 @@ def main():
                 assert result.returncode != 0 and key in result.stdout
             for service, key, value in [
                 ('wallet-ledger', 'WALLET_DB_CONNECTION', 'Host=postgres;Username=ravex_wallet;Password=weak'),
-                ('identity', 'ADMIN_BOOTSTRAP_PASSWORD', 'weak'),
+                ('identity-migrate', 'ADMIN_BOOTSTRAP_PASSWORD', 'weak'),
                 ('wallet-ledger', 'INTERNAL_SERVICE_KEY', 'weak'),
             ]:
                 result = run('run', '--rm', '--no-deps', '-e', key + '_FILE=', '-e', key + '=' + value, service, check=False)

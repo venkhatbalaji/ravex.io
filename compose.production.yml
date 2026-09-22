@@ -12,17 +12,22 @@ services:
     secrets:
       - postgres_password
       - identity_password
+      - identity_migrator_password
       - wallet_password
+      - wallet_migrator_password
       - market_catalog_password
+      - market_catalog_migrator_password
       - settlement_password
+      - settlement_migrator_password
       - branding_password
+      - branding_migrator_password
     healthcheck:
       test: [CMD-SHELL, "pg_isready -U postgres -d ravex"]
       interval: 2s
       timeout: 3s
       retries: 30
 
-  identity:
+  identity: &identity
     build:
       context: .
       dockerfile: services/identity/Dockerfile
@@ -32,20 +37,20 @@ services:
     security_opt: ["no-new-privileges:true"]
     networks: [backend]
     environment:
+      DATABASE_MODE: runtime
       DOTNET_ENVIRONMENT: Production
       JWT_SIGNING_KEY_FILE: /run/secrets/jwt_signing_key
       IDENTITY_DB_CONNECTION_FILE: /run/secrets/identity_connection
-      ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_BOOTSTRAP_EMAIL:?Set ADMIN_BOOTSTRAP_EMAIL}
-      ADMIN_BOOTSTRAP_PASSWORD_FILE: /run/secrets/admin_bootstrap_password
     secrets:
       - jwt_signing_key
       - identity_connection
-      - admin_bootstrap_password
     depends_on:
+      identity-migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
 
-  wallet-ledger:
+  wallet-ledger: &wallet-ledger
     build:
       context: .
       dockerfile: services/wallet-ledger/Dockerfile
@@ -55,6 +60,7 @@ services:
     security_opt: ["no-new-privileges:true"]
     networks: [backend]
     environment:
+      DATABASE_MODE: runtime
       DOTNET_ENVIRONMENT: Production
       JWT_SIGNING_KEY_FILE: /run/secrets/jwt_signing_key
       WALLET_DB_CONNECTION_FILE: /run/secrets/wallet_connection
@@ -64,10 +70,12 @@ services:
       - wallet_connection
       - internal_service_key
     depends_on:
+      wallet-ledger-migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
 
-  market-catalog:
+  market-catalog: &market-catalog
     build:
       context: .
       dockerfile: services/market-catalog/Dockerfile
@@ -77,6 +85,7 @@ services:
     security_opt: ["no-new-privileges:true"]
     networks: [backend]
     environment:
+      DATABASE_MODE: runtime
       DOTNET_ENVIRONMENT: Production
       JWT_SIGNING_KEY_FILE: /run/secrets/jwt_signing_key
       MARKET_CATALOG_DB_CONNECTION_FILE: /run/secrets/market_catalog_connection
@@ -87,10 +96,12 @@ services:
       - market_catalog_connection
       - internal_service_key
     depends_on:
+      market-catalog-migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
 
-  settlement-engine:
+  settlement-engine: &settlement-engine
     build:
       context: ./services/settlement-engine
     read_only: true
@@ -99,6 +110,7 @@ services:
     security_opt: ["no-new-privileges:true"]
     networks: [backend]
     environment:
+      DATABASE_MODE: runtime
       APP_ENV: Production
       SETTLEMENT_DB_CONNECTION_FILE: /run/secrets/settlement_connection
       INTERNAL_SERVICE_KEY_FILE: /run/secrets/internal_service_key
@@ -109,10 +121,12 @@ services:
       - settlement_connection
       - internal_service_key
     depends_on:
+      settlement-engine-migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
 
-  branding:
+  branding: &branding
     build:
       context: .
       dockerfile: services/branding/Dockerfile
@@ -122,12 +136,83 @@ services:
     security_opt: ["no-new-privileges:true"]
     networks: [backend]
     environment:
+      DATABASE_MODE: runtime
       DOTNET_ENVIRONMENT: Production
       JWT_SIGNING_KEY_FILE: /run/secrets/jwt_signing_key
       BRANDING_DB_CONNECTION_FILE: /run/secrets/branding_connection
     secrets:
       - jwt_signing_key
       - branding_connection
+    depends_on:
+      branding-migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+
+  identity-migrate:
+    <<: *identity
+    restart: "no"
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      DATABASE_MODE: migrate
+      IDENTITY_DB_CONNECTION_FILE: /run/secrets/identity_migrator_connection
+      ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_BOOTSTRAP_EMAIL:?Set ADMIN_BOOTSTRAP_EMAIL}
+      ADMIN_BOOTSTRAP_PASSWORD_FILE: /run/secrets/admin_bootstrap_password
+    secrets:
+      - identity_migrator_connection
+      - admin_bootstrap_password
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  wallet-ledger-migrate:
+    <<: *wallet-ledger
+    restart: "no"
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      DATABASE_MODE: migrate
+      WALLET_DB_CONNECTION_FILE: /run/secrets/wallet_migrator_connection
+    secrets:
+      - wallet_migrator_connection
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  market-catalog-migrate:
+    <<: *market-catalog
+    restart: "no"
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      DATABASE_MODE: migrate
+      MARKET_CATALOG_DB_CONNECTION_FILE: /run/secrets/market_catalog_migrator_connection
+    secrets:
+      - market_catalog_migrator_connection
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  settlement-engine-migrate:
+    <<: *settlement-engine
+    restart: "no"
+    environment:
+      APP_ENV: Production
+      DATABASE_MODE: migrate
+      SETTLEMENT_DB_CONNECTION_FILE: /run/secrets/settlement_migrator_connection
+    secrets:
+      - settlement_migrator_connection
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  branding-migrate:
+    <<: *branding
+    restart: "no"
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      DATABASE_MODE: migrate
+      BRANDING_DB_CONNECTION_FILE: /run/secrets/branding_migrator_connection
+    secrets:
+      - branding_migrator_connection
     depends_on:
       postgres:
         condition: service_healthy
@@ -189,3 +274,23 @@ secrets:
     file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/branding_password
   branding_connection:
     file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/branding_connection
+  identity_migrator_password:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/identity_migrator_password
+  identity_migrator_connection:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/identity_migrator_connection
+  wallet_migrator_password:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/wallet_migrator_password
+  wallet_migrator_connection:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/wallet_migrator_connection
+  market_catalog_migrator_password:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/market_catalog_migrator_password
+  market_catalog_migrator_connection:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/market_catalog_migrator_connection
+  settlement_migrator_password:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/settlement_migrator_password
+  settlement_migrator_connection:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/settlement_migrator_connection
+  branding_migrator_password:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/branding_migrator_password
+  branding_migrator_connection:
+    file: ${RAVEX_SECRETS_DIR:?Set RAVEX_SECRETS_DIR}/branding_migrator_connection

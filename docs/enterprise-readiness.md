@@ -64,7 +64,7 @@ be replaced with named owners during release planning.
 | SEC-07 | Login, registration, earn and stake abuse limits | Partial | Per-process gateway quotas, 429/Retry-After and spoof-resistant keys implemented; distributed/edge limits, trusted-proxy deployment, service-level controls and load tests remain | Gateway/security |
 | SEC-08 | Production secrets and signing-key rotation | Partial — production blocker | Startup rejects development credentials; secret-file loading implemented; secret-manager integration and tested key rotation remain | Platform/security |
 | SEC-09 | Service identity and network isolation | Partial | Internal key enforced and private production backend network implemented; distinct service credentials, rotation and TLS/mTLS remain | Platform |
-| SEC-10 | Least-privilege database roles | Partial — production blocker | Production service roles confined to their schemas; separate runtime and migration principals remain | Platform/backend |
+| SEC-10 | Least-privilege database roles | Implemented for new production deployments | Separate schema-owning migration jobs and DML-only runtime roles; DDL/history mutation denials and fail-closed startup tested. Existing-volume ownership transfer requires a planned upgrade; see [migration contract](database-migrations.md) | Platform/backend |
 | SEC-11 | Input, payload and resource limits | Partial | Stake and backlog parameters bounded; review all APIs, uploads, bulk writes and timeouts | Backend/security |
 | SEC-12 | Vulnerability and supply-chain controls | Open | Dependency/container scans, remediation SLA, SBOM, pinned artifacts and secret scanning | Platform/security |
 | SEC-13 | Threat model and independent security review | Open | Abuse cases, attack surface, penetration test and tracked remediation | Security |
@@ -95,7 +95,7 @@ be replaced with named owners during release planning.
 | OPS-06 | Backup and point-in-time restore | Open — production blocker | Encrypted backups plus timed restore drill and reconciled balances; approved RPO/RTO | Platform/wallet |
 | OPS-07 | High availability and disaster recovery | Open | Failover topology, recovery runbook, regional failure and dependency drills | Platform |
 | OPS-08 | Capacity and performance | Open | Agreed concurrency/data-volume targets; p95/p99/load/soak evidence and query plans | Backend/platform |
-| OPS-09 | Migration and rollback strategy | Partial | Versioned migrations exist; separate deployment migration job, compatibility and roll-forward/rollback drills remain | Backend/platform |
+| OPS-09 | Migration and rollback strategy | Partial | Separate migration jobs, serialized reruns and failure-gated runtime startup implemented; legacy-volume upgrade, compatibility and roll-forward/rollback drills remain | Backend/platform |
 | OPS-10 | Repeatable builds and release promotion | Partial | Compose and CI functional suite work; environment promotion, approvals, signed images and rollback automation remain | Platform |
 | OPS-11 | Frontend production packaging | Open | Reproducible production images, runtime configuration and edge/TLS deployment | Frontend/platform |
 | OPS-12 | API lifecycle and contract compatibility | Partial | OpenAPI exists; versioning/deprecation policy and compatibility tests remain | Backend |
@@ -146,6 +146,17 @@ filters, processing decisions beyond the first page, browser pagination and
 error recovery, and same-key retry after a lost response and market closure.
 See [market discovery](market-discovery.md) for the legacy-list cap and remaining
 capacity/clock limitations.
+
+On 2026-09-22, the migration-separation increment passed workspace typechecks,
+`npm run test:production`, and `npm run test:ui` (real services/PostgreSQL, Go
+tests/vet and all three Chromium journeys). Production checks cover missing
+migrations, isolated runtime/job secrets, DML-only runtime access, denied DDL
+and migration-history writes, privileged-runtime rejection, serialized job
+reruns, migration failure/retry gates and application data across restarts.
+SEC-10 is implemented for newly initialized production deployments; existing
+volumes still require the ownership upgrade described in the
+[migration operations contract](database-migrations.md). No live deployment or
+remote CI run is implied.
 
 A beta release requires, at minimum, keeping unverified rewards disabled, agreeing
 eligibility/terms, securing deployment credentials/networks, assigning support

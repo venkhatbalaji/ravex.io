@@ -27,12 +27,24 @@ func main() {
 	}
 	key := settings.Key
 	startup, cancel := context.WithTimeout(ctx, 30*time.Second)
-	repo, err := store.Open(startup, settings.Database)
+	var repo *store.PostgresRepository
+	switch settings.Mode {
+	case "auto":
+		repo, err = store.Open(startup, settings.Database)
+	case "migrate":
+		repo, err = store.OpenMigrator(startup, settings.Database, !settings.Development)
+	default:
+		repo, err = store.OpenRuntime(startup, settings.Database, !settings.Development)
+	}
 	cancel()
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer repo.Shutdown()
+	if settings.Mode == "migrate" {
+		log.Print("database migrations completed")
+		return
+	}
 	wallet := walletclient.NewHTTPClient(settings.Wallet, key)
 	markets := marketclient.NewHTTPClient(settings.Catalog)
 	identity := identityclient.NewHTTPClient(settings.Identity)

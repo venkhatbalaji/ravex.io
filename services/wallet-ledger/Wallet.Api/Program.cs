@@ -11,7 +11,7 @@ using Wallet.Infrastructure.Persistence;
 var builder = WebApplication.CreateBuilder(args);
 Ravex.Configuration.ProductionConfiguration.Configure(builder, "WALLET_DB_CONNECTION", internalKey: true);
 var serviceKey = builder.Configuration["INTERNAL_SERVICE_KEY"];
-if (string.IsNullOrWhiteSpace(serviceKey) || serviceKey.Length < 32)
+if (Ravex.Configuration.ProductionConfiguration.DatabaseMode(builder) != "migrate" && (string.IsNullOrWhiteSpace(serviceKey) || serviceKey.Length < 32))
     throw new InvalidOperationException("INTERNAL_SERVICE_KEY must contain at least 32 characters.");
 
 builder.Services.AddWalletInfrastructure(builder.Configuration);
@@ -59,10 +59,17 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<WalletDbContext>();
-    db.Database.Migrate();
+    await Ravex.Configuration.DatabaseStartup.InitializeAsync(db, builder, "wallet", async () =>
+    {
+        var accounts = scope.ServiceProvider.GetRequiredService<IAccountRepository>();
+        await accounts.EnsureSystemAccountsSeededAsync();
+    });
+}
 
-    var accounts = scope.ServiceProvider.GetRequiredService<IAccountRepository>();
-    await accounts.EnsureSystemAccountsSeededAsync();
+if (Ravex.Configuration.ProductionConfiguration.DatabaseMode(builder) == "migrate")
+{
+    await app.DisposeAsync();
+    return;
 }
 
 app.UseSwagger();

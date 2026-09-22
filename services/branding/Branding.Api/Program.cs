@@ -59,10 +59,17 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<BrandingDbContext>();
-    db.Database.Migrate();
+    await Ravex.Configuration.DatabaseStartup.InitializeAsync(db, builder, "branding", async () =>
+    {
+        var themes = scope.ServiceProvider.GetRequiredService<IThemeRepository>();
+        await themes.EnsureSeededAsync();
+    });
+}
 
-    var themes = scope.ServiceProvider.GetRequiredService<IThemeRepository>();
-    await themes.EnsureSeededAsync();
+if (Ravex.Configuration.ProductionConfiguration.DatabaseMode(builder) == "migrate")
+{
+    await app.DisposeAsync();
+    return;
 }
 
 app.UseSwagger();

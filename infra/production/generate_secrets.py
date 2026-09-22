@@ -19,13 +19,15 @@ def generate(directory):
     for name in ("postgres_password", "jwt_signing_key", "internal_service_key", "admin_bootstrap_password"):
         write(name, secrets.token_urlsafe(48))
     for service in ("identity", "wallet", "market_catalog", "settlement", "branding"):
-        password = secrets.token_urlsafe(48)
-        write(service + "_password", password)
-        if service == "settlement":
-            connection = f"postgres://ravex_{service}:{password}@postgres:5432/ravex?sslmode=disable"
-        else:
-            connection = f"Host=postgres;Database=ravex;Username=ravex_{service};Password={password};Search Path={service}"
-        write(service + "_connection", connection)
+        for suffix in ("", "_migrator"):
+            principal = service + suffix
+            password = secrets.token_urlsafe(48)
+            write(principal + "_password", password)
+            if service == "settlement":
+                connection = f"postgres://ravex_{principal}:{password}@postgres:5432/ravex?sslmode=disable"
+            else:
+                connection = f"Host=postgres;Database=ravex;Username=ravex_{principal};Password={password};Search Path={service}"
+            write(principal + "_connection", connection)
 
 
 if __name__ == "__main__":

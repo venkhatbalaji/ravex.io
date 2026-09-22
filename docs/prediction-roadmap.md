@@ -228,3 +228,13 @@ and initializes separate PostgreSQL roles confined to service schemas. Its dispo
 smoke test is included in `npm run test:all`. See [deployment instructions and
 remaining limitations](production-deployment.md); this does not complete the
 enterprise readiness register.
+
+## Production migration separation
+
+The production baseline now runs dedicated migration jobs with schema-owning
+credentials. Runtime services have only data access, check required migration
+versions before serving, and reject schema-owner credentials. Development retains
+automatic migrations. See [migration operations](database-migrations.md) for
+release commands, permission tests and the required ownership upgrade for old
+production volumes. Legacy-data reconciliation, rollback drills, session
+lifecycle, administrative audit events and the other release gates remain open.

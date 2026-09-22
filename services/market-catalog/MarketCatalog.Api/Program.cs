@@ -59,7 +59,13 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<MarketCatalogDbContext>();
-    db.Database.Migrate();
+    await Ravex.Configuration.DatabaseStartup.InitializeAsync(db, builder, "market_catalog");
+}
+
+if (Ravex.Configuration.ProductionConfiguration.DatabaseMode(builder) == "migrate")
+{
+    await app.DisposeAsync();
+    return;
 }
 
 app.UseSwagger();

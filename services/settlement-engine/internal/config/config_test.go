@@ -9,7 +9,7 @@ import (
 
 func setup(t *testing.T) {
 	t.Helper()
-	for _, key := range []string{"APP_ENV", "INTERNAL_SERVICE_KEY", "INTERNAL_SERVICE_KEY_FILE", "SETTLEMENT_DB_CONNECTION", "SETTLEMENT_DB_CONNECTION_FILE", "WALLET_SERVICE_URL", "MARKET_CATALOG_SERVICE_URL", "IDENTITY_SERVICE_URL"} {
+	for _, key := range []string{"DATABASE_MODE", "APP_ENV", "INTERNAL_SERVICE_KEY", "INTERNAL_SERVICE_KEY_FILE", "SETTLEMENT_DB_CONNECTION", "SETTLEMENT_DB_CONNECTION_FILE", "WALLET_SERVICE_URL", "MARKET_CATALOG_SERVICE_URL", "IDENTITY_SERVICE_URL"} {
 		t.Setenv(key, "")
 	}
 }
@@ -51,5 +51,26 @@ func TestFilesAndCredentialValidation(t *testing.T) {
 	t.Setenv("SETTLEMENT_DB_CONNECTION", "postgres://ravex_settlement:"+strings.Repeat("p", 48)+"@postgres/ravex?password=weak")
 	if _, err := Load(); err == nil {
 		t.Fatal("query password override accepted")
+	}
+}
+
+func TestDatabaseModes(t *testing.T) {
+	setup(t)
+	t.Setenv("DATABASE_MODE", "auto")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "only in Development") {
+		t.Fatal("production auto migrations accepted")
+	}
+	t.Setenv("DATABASE_MODE", "invalid")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "DATABASE_MODE") {
+		t.Fatal("invalid mode accepted")
+	}
+	t.Setenv("DATABASE_MODE", "migrate")
+	t.Setenv("SETTLEMENT_DB_CONNECTION", "postgres://ravex_settlement_migrator:"+strings.Repeat("p", 48)+"@postgres/ravex")
+	if s, err := Load(); err != nil || s.Mode != "migrate" || s.Key != "" {
+		t.Fatalf("migration job should need only database credentials: %v", err)
+	}
+	t.Setenv("SETTLEMENT_DB_CONNECTION", "postgres://ravex_settlement_migrator:weak@postgres/ravex")
+	if _, err := Load(); err == nil {
+		t.Fatal("migration job accepted weak credentials")
 	}
 }

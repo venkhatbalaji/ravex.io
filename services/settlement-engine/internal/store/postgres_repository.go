@@ -20,7 +20,20 @@ type PostgresRepository struct {
 	connection string
 }
 
+// Open preserves automatic migrations for development and isolated store tests.
 func Open(ctx context.Context, connection string) (*PostgresRepository, error) {
+	return open(ctx, connection, true, false)
+}
+
+func OpenMigrator(ctx context.Context, connection string, production bool) (*PostgresRepository, error) {
+	return open(ctx, connection, true, production)
+}
+
+func OpenRuntime(ctx context.Context, connection string, production bool) (*PostgresRepository, error) {
+	return open(ctx, connection, false, production)
+}
+
+func open(ctx context.Context, connection string, migrate, production bool) (*PostgresRepository, error) {
 	db, err := sql.Open("postgres", connection)
 	if err != nil {
 		return nil, err
@@ -29,7 +42,11 @@ func Open(ctx context.Context, connection string) (*PostgresRepository, error) {
 	db.SetMaxIdleConns(5)
 	repo := &PostgresRepository{db: db, connection: connection}
 	if err = db.PingContext(ctx); err == nil {
-		err = repo.migrate(ctx)
+		if migrate {
+			err = repo.migrate(ctx, production)
+		} else {
+			err = repo.checkRuntime(ctx, production)
+		}
 	}
 	if err != nil {
 		db.Close()
@@ -40,7 +57,16 @@ func Open(ctx context.Context, connection string) (*PostgresRepository, error) {
 
 func (r *PostgresRepository) Shutdown() error { return r.db.Close() }
 
-func (r *PostgresRepository) migrate(ctx context.Context) error {
+func (r *PostgresRepository) migrate(ctx context.Context, production bool) error {
+	if production {
+		var ownsSchema bool
+		if err := r.db.QueryRowContext(ctx, "SELECT pg_get_userbyid(nspowner)=current_user FROM pg_namespace WHERE nspname='settlement'").Scan(&ownsSchema); err != nil {
+			return err
+		}
+		if !ownsSchema {
+			return fmt.Errorf("migration database role must own its service schema")
+		}
+	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -81,7 +107,43 @@ func (r *PostgresRepository) migrate(ctx context.Context) error {
 			return err
 		}
 	}
+	if production {
+		if _, err = tx.ExecContext(ctx, "REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON settlement.schema_migrations FROM ravex_settlement"); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
+}
+
+func (r *PostgresRepository) checkRuntime(ctx context.Context, production bool) error {
+	if production {
+		var privileged bool
+		err := r.db.QueryRowContext(ctx, `SELECT has_schema_privilege(current_user, 'settlement', 'CREATE')
+            OR has_database_privilege(current_user, current_database(), 'CREATE')
+            OR EXISTS (SELECT 1 FROM pg_namespace WHERE nspname='settlement' AND pg_has_role(current_user,nspowner,'MEMBER'))
+            OR EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+                WHERE n.nspname='settlement' AND pg_has_role(current_user,c.relowner,'MEMBER'))`).Scan(&privileged)
+		if err != nil {
+			return err
+		}
+		if privileged {
+			return fmt.Errorf("runtime database role must not own schema objects or have migration privileges")
+		}
+	}
+	entries, err := migrations.ReadDir("migrations")
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		var applied bool
+		if err = r.db.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM settlement.schema_migrations WHERE name=$1)", entry.Name()).Scan(&applied); err != nil {
+			return fmt.Errorf("cannot verify database migrations; run the migration job: %w", err)
+		}
+		if !applied {
+			return fmt.Errorf("pending database migrations: run the migration job before starting this service")
+		}
+	}
+	return nil
 }
 
 const stakeColumns = "id, user_id, idempotency_key, market_id, outcome_id, amount, state, created_at, updated_at"

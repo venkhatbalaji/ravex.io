@@ -24,7 +24,8 @@ multi-tenant hosting model would add on top of this.
 
 There is no "sign up as admin" flow, and there never should be — Identity's
 public `/auth/register` always creates a `Player` account, full stop. The
-**only** way an `Admin` account exists is Identity's startup bootstrap:
+**only** provisioning path is Identity's controlled bootstrap. In Development
+it runs at startup; in production it runs only in `identity-migrate`:
 
 ```yaml
 # docker-compose.yml, identity service
@@ -32,12 +33,16 @@ ADMIN_BOOTSTRAP_EMAIL: admin@predictplay.local          # change outside local d
 ADMIN_BOOTSTRAP_PASSWORD: dev-only-admin-password-change-me!  # change outside local dev
 ```
 
-On every startup, Identity checks whether a user with that email already
+On each Development startup or migration job, Identity checks whether a user with that email already
 exists; if not, it creates exactly one `Admin` account with that email and
 password. It's idempotent — leaving the variables set across restarts does
 nothing once the account exists. There's no path from a `Player` account to
 `Admin` today; promoting someone means creating a second bootstrap-style
 account (or, later, a real admin-invite flow — not built yet).
+
+For production credential mounts and removing bootstrap credentials after initial
+setup, see [migration operations](database-migrations.md). The runtime Identity
+service has no bootstrap password in the production configuration.
 
 Log in with those credentials in `apps/admin` (or via `POST /auth/login`
 directly). The issued JWT carries a `role` claim (`Player` or `Admin`); every

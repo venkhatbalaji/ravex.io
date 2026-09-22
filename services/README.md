@@ -150,10 +150,11 @@ Set `INTERNAL_SERVICE_KEY` to a
 shared secret of at least 32 characters for Wallet, Catalog, and Settlement
 outside the local defaults. Settlement also accepts `SETTLEMENT_DB_CONNECTION`,
 `WALLET_SERVICE_URL`, `MARKET_CATALOG_SERVICE_URL`, and `IDENTITY_SERVICE_URL`.
-Catalog uses `SETTLEMENT_SERVICE_URL` to close admission. Identity's
+Catalog uses `SETTLEMENT_SERVICE_URL` to close admission. Identity's migration job
+(or Development auto mode) uses
 `ADMIN_BOOTSTRAP_EMAIL`/`ADMIN_BOOTSTRAP_PASSWORD` (defaults:
 `admin@predictplay.local` / a dev-only password — see `docker-compose.yml`,
-change both outside local dev) seed the one Admin account this deployment
+change both outside local dev) to seed the one Admin account this deployment
 starts with. Configuration is in root `docker-compose.yml`. Gateway permits
 browser requests from `http://localhost:3001`, including the idempotency
 header. Configure `Cors:AllowedOrigins` (for example `Cors__AllowedOrigins__0`)
@@ -196,11 +197,13 @@ curl -s -X POST localhost:5100/pools/<marketId>/settle \
 
 ## Migrations and checks
 
-.NET services apply EF migrations on startup, with separate migration history
-per schema. Add an EF migration using the matching Infrastructure project and
+.NET services apply EF migrations automatically in Development, with separate
+migration history per schema. Production uses dedicated migration jobs and DML-only
+runtime roles; see [migration operations and upgrade notes](../docs/database-migrations.md). Add an EF migration using the matching Infrastructure project and
 Api startup project; pin `dotnet-ef` to version `8.0.10`. Settlement embeds
-ordered SQL migrations from `internal/store/migrations`; it applies unapplied
-files at startup under a database advisory lock and records them in
+ordered SQL migrations from `internal/store/migrations`; its migration mode
+(and Development auto mode) applies unapplied files under a database advisory
+lock and records them in
 `settlement.schema_migrations`.
 
 Run the full isolated integration suite with Docker and Python 3:

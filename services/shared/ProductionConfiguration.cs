@@ -10,9 +10,11 @@ public static class ProductionConfiguration
 {
     public static void Configure(WebApplicationBuilder builder, string? databaseKey = null, bool internalKey = false, bool bootstrap = false)
     {
-        var keys = new List<string> { "JWT_SIGNING_KEY" };
+        var migrationOnly = databaseKey is not null && DatabaseMode(builder) == "migrate";
+        var keys = new List<string>();
+        if (!migrationOnly) keys.Add("JWT_SIGNING_KEY");
         if (databaseKey is not null) keys.Add(databaseKey);
-        if (internalKey) keys.Add("INTERNAL_SERVICE_KEY");
+        if (internalKey && !migrationOnly) keys.Add("INTERNAL_SERVICE_KEY");
         if (bootstrap) keys.Add("ADMIN_BOOTSTRAP_PASSWORD");
         foreach (var key in keys)
         {
@@ -25,8 +27,8 @@ public static class ProductionConfiguration
             builder.Configuration[key] = value;
         }
         if (builder.Environment.IsDevelopment()) return;
-        RequireSecret("JWT_SIGNING_KEY", builder.Configuration["JWT_SIGNING_KEY"]);
-        if (internalKey)
+        if (!migrationOnly) RequireSecret("JWT_SIGNING_KEY", builder.Configuration["JWT_SIGNING_KEY"]);
+        if (internalKey && !migrationOnly)
         {
             RequireSecret("INTERNAL_SERVICE_KEY", builder.Configuration["INTERNAL_SERVICE_KEY"]);
             if (builder.Configuration["INTERNAL_SERVICE_KEY"] == builder.Configuration["JWT_SIGNING_KEY"])
@@ -59,6 +61,15 @@ public static class ProductionConfiguration
                 RequireSecret("ADMIN_BOOTSTRAP_PASSWORD", password);
             }
         }
+    }
+    public static string DatabaseMode(WebApplicationBuilder builder)
+    {
+        var mode = builder.Configuration["DATABASE_MODE"] ?? (builder.Environment.IsDevelopment() ? "auto" : "runtime");
+        if (mode is not ("runtime" or "migrate" or "auto"))
+            Fail("DATABASE_MODE", "must be runtime, migrate, or auto");
+        if (mode == "auto" && !builder.Environment.IsDevelopment())
+            Fail("DATABASE_MODE", "auto is allowed only in Development");
+        return mode;
     }
     private static void RequireSecret(string key, string? value)
     {

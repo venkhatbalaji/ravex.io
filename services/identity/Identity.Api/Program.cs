@@ -59,24 +59,31 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-    db.Database.Migrate();
-
-    // The only way an Admin account is ever created — public /auth/register
-    // always issues Player accounts. Set both env vars to seed the first
-    // admin; idempotent, safe to leave set across restarts.
-    var bootstrapEmail = builder.Configuration["ADMIN_BOOTSTRAP_EMAIL"];
-    var bootstrapPassword = builder.Configuration["ADMIN_BOOTSTRAP_PASSWORD"];
-    if (!string.IsNullOrWhiteSpace(bootstrapEmail) && !string.IsNullOrWhiteSpace(bootstrapPassword))
+    await Ravex.Configuration.DatabaseStartup.InitializeAsync(db, builder, "identity", async () =>
     {
-        var users = scope.ServiceProvider.GetRequiredService<IUserRepository>();
-        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-        var email = bootstrapEmail.Trim().ToLowerInvariant();
-        if (!await users.ExistsByEmailAsync(email))
+        // The only way an Admin account is ever created — public /auth/register
+        // always issues Player accounts. Set both env vars to seed the first
+        // admin; idempotent, safe to leave set across restarts.
+        var bootstrapEmail = builder.Configuration["ADMIN_BOOTSTRAP_EMAIL"];
+        var bootstrapPassword = builder.Configuration["ADMIN_BOOTSTRAP_PASSWORD"];
+        if (!string.IsNullOrWhiteSpace(bootstrapEmail) && !string.IsNullOrWhiteSpace(bootstrapPassword))
         {
-            var admin = User.RegisterAdmin(email, "Admin", hasher.Hash(bootstrapPassword));
-            await users.AddAsync(admin);
+            var users = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+            var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+            var email = bootstrapEmail.Trim().ToLowerInvariant();
+            if (!await users.ExistsByEmailAsync(email))
+            {
+                var admin = User.RegisterAdmin(email, "Admin", hasher.Hash(bootstrapPassword));
+                await users.AddAsync(admin);
+            }
         }
-    }
+    });
+}
+
+if (Ravex.Configuration.ProductionConfiguration.DatabaseMode(builder) == "migrate")
+{
+    await app.DisposeAsync();
+    return;
 }
 
 app.UseSwagger();

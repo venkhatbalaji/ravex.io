@@ -11,6 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="../../shared/DatabaseStartup.cs" Link="Configuration/DatabaseStartup.cs" />
     <Compile Include="../../shared/ProductionConfiguration.cs" Link="Configuration/ProductionConfiguration.cs" />
   </ItemGroup>
 </Project>
