@@ -236,5 +236,16 @@ credentials. Runtime services have only data access, check required migration
 versions before serving, and reject schema-owner credentials. Development retains
 automatic migrations. See [migration operations](database-migrations.md) for
 release commands, permission tests and the required ownership upgrade for old
-production volumes. Legacy-data reconciliation, rollback drills, session
-lifecycle, administrative audit events and the other release gates remain open.
+production volumes. Legacy-data reconciliation, rollback drills, server-side session
+renewal/revocation, administrative audit events and the other release gates remain open.
+
+
+## Browser session lifecycle
+
+Player and Admin now share expiry handling, retryable saved-session verification,
+same-origin cross-tab logout, and private cache/form cleanup on identity changes.
+Late unauthorized responses cannot erase a newer login, and an uncertain
+prediction retains its original request key through reauthentication.
+See [session behavior and test coverage](browser-sessions.md). Server-side
+renewal, rotation, revocation and all-device logout remain unfinished; tokens
+are still stored in localStorage pending the SEC-05 session design.

@@ -9,7 +9,7 @@ import { useCountUp } from "@/components/use-count-up";
 import { useCopy } from "@/context/branding-context";
 
 export default function WalletPage() {
-  const { token, isLoading } = useAuth();
+  const { token, isLoading, sessionStatus } = useAuth();
   const queryClient = useQueryClient();
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -59,6 +59,7 @@ export default function WalletPage() {
   }
 
   if (isLoading) return <p className="text-sm text-muted">Loading wallet…</p>;
+  if (sessionStatus === "unavailable") return <p className="text-sm text-muted">Verify your saved session to continue.</p>;
   if (!token) return <p className="text-sm text-muted"><Link href="/login" className="text-accent-text underline">Log in</Link> to view your wallet and claim rewards.</p>;
 
   return (

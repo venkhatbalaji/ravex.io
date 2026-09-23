@@ -13,7 +13,7 @@ const labels: Record<Prediction["result"], string> = {
 };
 
 export default function PredictionsPage() {
-  const { token, user, isLoading } = useAuth();
+  const { token, user, isLoading, sessionStatus } = useAuth();
   const [offset, setOffset] = useState(0);
   const heading = useCopy("predictions.heading", "My predictions");
   const { data, error, isPending } = useQuery({
@@ -21,6 +21,7 @@ export default function PredictionsPage() {
     queryFn: () => api.predictions(token!, offset), enabled: Boolean(token && user), refetchInterval: 3000,
   });
   if (isLoading) return <p className="text-muted">Loading…</p>;
+  if (sessionStatus === "unavailable") return <p className="text-sm text-muted">Verify your saved session to continue.</p>;
   if (!token || !user) return <p className="text-muted"><Link href="/login" className="text-accent-text underline">Log in</Link> to see your predictions.</p>;
   return (
     <section className="space-y-6">

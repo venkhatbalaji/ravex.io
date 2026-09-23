@@ -8,7 +8,7 @@ const fieldClass =
   "block w-full rounded-md border border-border-strong bg-surface-2 px-3 py-2 text-sm text-fg outline-none transition focus:border-accent";
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, isLoading } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,6 +28,8 @@ export default function LoginPage() {
       setSubmitting(false);
     }
   }
+
+  if (isLoading) return <p className="text-sm text-muted">Checking saved session…</p>;
 
   return (
     <div className="mx-auto max-w-sm space-y-6 py-16">

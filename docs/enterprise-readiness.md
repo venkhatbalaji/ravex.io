@@ -58,7 +58,7 @@ be replaced with named owners during release planning.
 | SEC-01 | Authorization at gateway and owning service | Implemented for current admin routes | Player/anonymous denial tests; repeat on every new sensitive route | Security/backend |
 | SEC-02 | Fine-grained operator permissions | Open | Separate support, market editor, result approver and platform administrator; deny-by-default matrix | Identity/product |
 | SEC-03 | MFA and enterprise SSO | Open | Admin MFA, recovery controls, OIDC/SAML design where customers require it | Identity |
-| SEC-04 | Session renewal, revocation and logout | Partial | JWT login and reload restoration work; rotation, revocation and all-device logout remain | Identity/frontend |
+| SEC-04 | Session renewal, revocation and logout | Partial | Browser expiry, retryable restoration, cross-tab logout and private-state cleanup implemented; [session contract and browser tests](browser-sessions.md). Server renewal, rotation, revocation and all-device logout remain | Identity/frontend |
 | SEC-05 | Browser token and XSS protection | Open | Review localStorage token exposure; choose cookie/BFF or other session design, CSP and CSRF controls as applicable | Security/frontend |
 | SEC-06 | Password reset and email verification | Open | Expiring one-use tokens, enumeration resistance, rate limits and mail delivery evidence | Identity |
 | SEC-07 | Login, registration, earn and stake abuse limits | Partial | Per-process gateway quotas, 429/Retry-After and spoof-resistant keys implemented; distributed/edge limits, trusted-proxy deployment, service-level controls and load tests remain | Gateway/security |

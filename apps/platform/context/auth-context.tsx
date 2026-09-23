@@ -1,6 +1,8 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useCallback, Fragment, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useBrowserSession, type SessionStatus } from "@ravex/browser-session";
 import { api } from "@/lib/api";
 
 interface AuthUser {
@@ -14,81 +16,58 @@ interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  sessionStatus: SessionStatus;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-const STORAGE_KEY = "ravex.platform.token";
+const privateQueries = new Set(["balance", "ledger", "rewards", "predictions"]);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(null);
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [storageReady, setStorageReady] = useState(false);
-
-  // Reading localStorage has to wait for the client mount — the server render
-  // never has a token, so hydration always starts logged-out on purpose.
-  useEffect(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    setToken(stored);
-    setStorageReady(true);
-  }, []);
-
-  useEffect(() => {
-    if (!storageReady) return;
-    if (!token) {
-      setUser(null);
-      setIsLoading(false);
-      return;
-    }
-    let cancelled = false;
-    api
-      .me(token)
-      .then((me) => { if (!cancelled) setUser(me); })
-      .catch(() => {
-        if (cancelled) return;
-        setToken(null);
-        setUser(null);
-      })
-      .finally(() => { if (!cancelled) setIsLoading(false); });
-    return () => { cancelled = true; };
-  }, [token, storageReady]);
-
-  useEffect(() => {
-    // Do not erase the stored session during the initial hydration render.
-    if (!storageReady) return;
-    if (token) window.localStorage.setItem(STORAGE_KEY, token);
-    else window.localStorage.removeItem(STORAGE_KEY);
-  }, [token, storageReady]);
-
-  const value = useMemo<AuthContextValue>(
-    () => ({
-      token,
-      user,
-      isAuthenticated: Boolean(token && user),
-      isLoading,
-      async login(email, password) {
-        const result = await api.login(email, password);
-        setToken(result.accessToken);
-        setUser(result.user);
-      },
-      async register(email, password, displayName) {
-        await api.register(email, password, displayName);
-        const result = await api.login(email, password);
-        setToken(result.accessToken);
-        setUser(result.user);
-      },
-      logout() {
-        setToken(null);
-        setUser(null);
-      },
+  const queryClient = useQueryClient();
+  const clearPrivateData = useCallback(() => {
+    const filters = { predicate: (query: { queryKey: readonly unknown[] }) => privateQueries.has(String(query.queryKey[0])) };
+    void queryClient.cancelQueries(filters);
+    queryClient.removeQueries(filters);
+  }, [queryClient]);
+  const session = useBrowserSession<AuthUser>({
+    storageKey: "ravex.platform.token",
+    loadUser: api.me,
+    onSessionChange: clearPrivateData,
+  });
+  const value: AuthContextValue = {
+    token: session.token,
+    user: session.user,
+    isAuthenticated: session.isAuthenticated,
+    isLoading: session.isLoading,
+    sessionStatus: session.status,
+    login: (email, password) => session.signIn(() => api.login(email, password)),
+    register: (email, password, displayName) => session.signIn(async () => {
+      await api.register(email, password, displayName);
+      return api.login(email, password);
     }),
-    [token, user, isLoading],
-  );
+    logout: session.logout,
+  };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {session.notice && (
+        <div role="alert" className="border-b border-border bg-surface px-6 py-4 text-sm text-fg">
+          <p>{session.notice}</p>
+          {session.status === "unavailable" && (
+            <div className="mt-2 flex gap-4">
+              <button type="button" className="underline" onClick={session.retrySession}>Retry session verification</button>
+              <button type="button" className="underline" onClick={session.logout}>Clear saved session</button>
+            </div>
+          )}
+        </div>
+      )}
+      {/* Drop private form state on identity changes; uncertain stake receipts stay in sessionStorage. */}
+      <Fragment key={session.isAuthenticated ? session.epoch : "anonymous"}>{children}</Fragment>
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {

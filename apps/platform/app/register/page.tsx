@@ -5,13 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/auth-context";
 import { useCopy } from "@/context/branding-context";
-import { ApiError } from "@/lib/api";
 
 const fieldClass =
   "block w-full border-0 border-b border-border-strong bg-transparent py-2.5 text-sm text-fg normal-case tracking-normal outline-none transition focus:border-accent";
 
 export default function RegisterPage() {
-  const { register } = useAuth();
+  const { register, isLoading } = useAuth();
   const router = useRouter();
   const heading = useCopy("auth.registerHeading", "Create an account");
   const haveAccount = useCopy("auth.haveAccount", "Already have an account?");
@@ -29,11 +28,13 @@ export default function RegisterPage() {
       await register(email, password, displayName);
       router.push("/");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
+      setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
     } finally {
       setSubmitting(false);
     }
   }
+
+  if (isLoading) return <p className="text-sm text-muted">Checking saved session…</p>;
 
   return (
     <div data-reveal className="mx-auto max-w-sm space-y-6 py-10">

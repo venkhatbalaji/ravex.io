@@ -1,6 +1,8 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useCallback, Fragment, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useBrowserSession, type SessionStatus } from "@ravex/browser-session";
 import { api } from "@/lib/api";
 
 interface AdminUser {
@@ -14,85 +16,56 @@ interface AuthContextValue {
   user: AdminUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  sessionStatus: SessionStatus;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-const STORAGE_KEY = "ravex.admin.token";
+const privateQueries = new Set(["operations"]);
 
-// There is no registration flow here on purpose — an Admin account can only
-// come from Identity's controlled bootstrap (ADMIN_BOOTSTRAP_EMAIL/PASSWORD).
+const acceptAdmin = (user: AdminUser) => user.role === "Admin";
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(null);
-  const [user, setUser] = useState<AdminUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [storageReady, setStorageReady] = useState(false);
+  const queryClient = useQueryClient();
+  const clearPrivateData = useCallback(() => {
+    const filters = { predicate: (query: { queryKey: readonly unknown[] }) => privateQueries.has(String(query.queryKey[0])) };
+    void queryClient.cancelQueries(filters);
+    queryClient.removeQueries(filters);
+  }, [queryClient]);
+  const session = useBrowserSession<AdminUser>({
+    storageKey: "ravex.admin.token",
+    loadUser: api.me,
+    acceptUser: acceptAdmin,
+    onSessionChange: clearPrivateData,
+  });
+  const value: AuthContextValue = {
+    token: session.token,
+    user: session.user,
+    isAuthenticated: session.isAuthenticated,
+    isLoading: session.isLoading,
+    sessionStatus: session.status,
+    login: (email, password) => session.signIn(() => api.login(email, password)),
+    logout: session.logout,
+  };
 
-  useEffect(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    setToken(stored);
-    setStorageReady(true);
-  }, []);
-
-  useEffect(() => {
-    if (!storageReady) return;
-    if (!token) {
-      setUser(null);
-      setIsLoading(false);
-      return;
-    }
-    let cancelled = false;
-    api
-      .me(token)
-      .then((me) => {
-        if (cancelled) return;
-        if (me.role !== "Admin") {
-          setToken(null);
-          setUser(null);
-          return;
-        }
-        setUser(me);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setToken(null);
-        setUser(null);
-      })
-      .finally(() => { if (!cancelled) setIsLoading(false); });
-    return () => { cancelled = true; };
-  }, [token, storageReady]);
-
-  useEffect(() => {
-    // Do not erase the stored session during the initial hydration render.
-    if (!storageReady) return;
-    if (token) window.localStorage.setItem(STORAGE_KEY, token);
-    else window.localStorage.removeItem(STORAGE_KEY);
-  }, [token, storageReady]);
-
-  const value = useMemo<AuthContextValue>(
-    () => ({
-      token,
-      user,
-      isAuthenticated: Boolean(token && user),
-      isLoading,
-      async login(email, password) {
-        const result = await api.login(email, password);
-        if (result.user.role !== "Admin") {
-          throw new Error("This account doesn't have admin access.");
-        }
-        setToken(result.accessToken);
-        setUser({ id: result.user.id, email: result.user.email, role: result.user.role });
-      },
-      logout() {
-        setToken(null);
-        setUser(null);
-      },
-    }),
-    [token, user, isLoading],
+  return (
+    <AuthContext.Provider value={value}>
+      {session.notice && (
+        <div role="alert" className="border-b border-border bg-surface px-6 py-4 text-sm text-fg">
+          <p>{session.notice}</p>
+          {session.status === "unavailable" && (
+            <div className="mt-2 flex gap-4">
+              <button type="button" className="underline" onClick={session.retrySession}>Retry session verification</button>
+              <button type="button" className="underline" onClick={session.logout}>Clear saved session</button>
+            </div>
+          )}
+        </div>
+      )}
+      {/* Drop private operator form state when the session changes. */}
+      <Fragment key={session.isAuthenticated ? session.epoch : "anonymous"}>{children}</Fragment>
+    </AuthContext.Provider>
   );
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

@@ -1,3 +1,5 @@
+import { reportUnauthorized, sessionRequestIdentity } from "@ravex/browser-session";
+
 const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://localhost:5100";
 
 export class ApiError extends Error {
@@ -14,7 +16,9 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
   headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const res = await fetch(`${GATEWAY_URL}${path}`, { ...options, headers });
+  const requestSession = token ? sessionRequestIdentity(token) : null;
+  const res = await fetch(`${GATEWAY_URL}${path}`, { ...options, headers, cache: token ? "no-store" : options.cache });
+  if (res.status === 401 && token) reportUnauthorized(token, requestSession);
   if (!res.ok) {
     let message = res.statusText;
     try {
@@ -100,7 +104,7 @@ export const api = {
       "/auth/login",
       { method: "POST", body: JSON.stringify({ email, password }) },
     ),
-  me: (token: string) => request<{ id: string; email: string; role: string }>("/me", {}, token),
+  me: (token: string, signal?: AbortSignal) => request<{ id: string; email: string; role: string }>("/me", { signal }, token),
 
   markets: (filters: Partial<MarketFilters> = {}) => {
     const params = new URLSearchParams({ limit: "20", offset: String(filters.offset ?? 0) });

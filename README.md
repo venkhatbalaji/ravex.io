@@ -27,7 +27,7 @@ pagination and cutoff behavior are described in the [discovery contract](docs/ma
 - `apps/admin` — the operator tool: markets, categories, and branding, admin-role-gated — see [docs/admin-and-white-label.md](docs/admin-and-white-label.md)
 - `services` — prediction-market backend: `gateway` (YARP), `identity`, `wallet-ledger`, `market-catalog`, `branding` (.NET 8, Clean Architecture) and `settlement-engine` (Go) — see `services/README.md`
 - `infra/postgres` — local database bootstrap (the `inquiries` table for `apps/web`, plus per-service schemas for `services/*`)
-- `packages` — reserved for shared contracts, UI and configuration as services are added
+- `packages/browser-session` — shared player/Admin session restoration, expiry and logout handling; see the [session contract](docs/browser-sessions.md)
 
 Run the backend services with `docker compose up -d --build` (see `services/README.md` for the golden-path walkthrough and ports), then run the frontends natively — same pattern as `apps/web`, for proper hot-reload:
 
